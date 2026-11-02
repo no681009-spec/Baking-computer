@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>烘焙百分比計算器 (含上下火烤箱設定)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #fdfbf7;
+        }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+            font-variant-numeric: tabular-nums;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(217, 119, 6, 0.15);
+            box-shadow: 0 8px 32px 0 rgba(139, 90, 43, 0.08);
+        }
+        .toast-enter { transform: translateY(-100%); opacity: 0; }
+        .toast-enter-active { transform: translateY(0); opacity: 1; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+        .toast-leave { transform: translateY(0); opacity: 1; }
+        .toast-leave-active { transform: translateY(-100%); opacity: 0; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+    </style>
+</head>
+<body class="min-h-screen p-4 sm:p-8 text-gray-800 relative">
+
+    <div id="toastContainer" class="fixed top-4 left-0 right-0 z-50 flex flex-col items-center gap-2 pointer-events-none"></div>
+
+    <div class="max-w-5xl mx-auto glass-panel rounded-2xl p-6 sm:p-10 shadow-xl">
+        
+        <!-- Header -->
+        <header class="text-center mb-8 relative">
+            <h1 class="text-3xl sm:text-4xl font-black text-amber-800 mb-2 tracking-wide">🍞 烘焙材料計算器</h1>
+            <p class="text-gray-600 font-medium">以麵粉總量為 100% 精準換算 · 支援上下火烤溫紀錄</p>
+            
+            <!-- 雲端狀態徽章 -->
+            <div id="cloudStatus" class="absolute top-0 right-0 hidden sm:flex items-center gap-1.5 px-3 py-1 bg-green-50 border border-green-200 rounded-lg">
+                <span class="text-xs font-bold text-green-700">雲端已連線</span>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- 左側設定區 (佔 7 欄) -->
+            <div class="lg:col-span-7 space-y-6">
+                
+                <!-- 品項名稱設定 -->
+                <div class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+                    <div class="flex-1 w-full">
+                        <label for="recipeName" class="block text-base font-bold text-gray-800 mb-2">品項名稱 (選填)</label>
+                        <input type="text" id="recipeName" placeholder="例如：法式長棍麵包、山形吐司..."
+                               class="w-full text-lg font-medium p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors bg-white">
+                    </div>
+                    <!-- 操作按鈕群組 -->
+                    <div id="actionBtnGroup" class="flex flex-wrap sm:flex-col gap-2 shrink-0 w-full sm:w-auto mt-2 sm:mt-0">
+                        <button id="saveCloudBtn" class="hidden flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-sm text-sm items-center justify-center gap-1">
+                            儲存至雲端
+                        </button>
+                        <button id="openCloudModalBtn" class="hidden flex-1 sm:flex-none bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 font-bold py-2 px-4 rounded-lg transition-colors shadow-sm text-sm items-center justify-center gap-1">
+                            我的配方簿
+                        </button>
+                        <button id="exportLocalBtn" class="flex-1 sm:flex-none bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-sm text-sm flex items-center justify-center gap-1">
+                            下載配方檔
+                        </button>
+                        <label class="flex-1 sm:flex-none bg-white border border-teal-200 hover:bg-teal-50 text-teal-700 font-bold py-2 px-4 rounded-lg transition-colors shadow-sm text-sm flex items-center justify-center gap-1 cursor-pointer mb-0 m-0">
+                            載入配方檔
+                            <input type="file" id="importLocalInput" accept=".json" class="hidden">
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 麵團總量與酵種設定 - 預設留白無預設數字 -->
+                <div class="bg-amber-50 rounded-xl p-5 border border-amber-200 shadow-sm">
+                    <label for="targetDoughWeight" class="block text-base font-bold text-amber-900 mb-2">1. 請輸入「目標麵團總重量」(克)</label>
+                    <div class="relative mb-5">
+                        <input type="number" id="targetDoughWeight" value="" placeholder="請輸入目標重量，例如：1000" min="1" step="10"
+                               class="w-full text-2xl font-bold p-3 pl-4 pr-20 rounded-lg border-2 border-amber-300 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors bg-white placeholder:text-gray-300 placeholder:text-lg placeholder:font-normal">
+                        <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium text-lg">克 (g)</span>
+                    </div>
+
+                    <label for="targetHydration" class="block text-base font-bold text-blue-900 mb-2 border-t border-amber-200 pt-5">2. 請輸入「目標總水份 (水合率)」(%)</label>
+                    <div class="relative mb-2">
+                        <input type="number" id="targetHydration" value="" placeholder="請輸入水合率，例如：65" min="0" step="1"
+                               class="w-full text-2xl font-bold p-3 pl-4 pr-16 rounded-lg border-2 border-blue-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-blue-50 text-blue-900 placeholder:text-blue-300 placeholder:text-lg placeholder:font-normal">
+                        <span class="absolute right-4 top-1/2 -translate-y-1/2 text-blue-500 font-medium text-lg">%</span>
+                    </div>
+                    
+                    <div class="space-y-3 mt-6 border-t border-amber-200 pt-5">
+                        <h3 class="text-sm font-bold text-amber-800 flex items-center gap-1">
+                            進階：提撥總麵粉製作湯種/酵種 (選填)
+                        </h3>
+                        <p class="text-xs text-amber-700 mb-3">若有提撥請輸入比例，系統會自動從總麵粉與總水量中扣除，算出主麵團實際用量。</p>
+                        
+                        <!-- 湯種 -->
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-3 bg-white p-3 rounded-lg border border-amber-100 shadow-sm">
+                            <div class="w-16 font-bold text-amber-900 text-sm shrink-0">湯種</div>
+                            <div class="flex flex-wrap items-center gap-2 shrink-0">
+                                <div class="flex items-center gap-1">
+                                    <input type="number" id="tzPercent" value="" placeholder="0" min="0" step="1" class="w-16 p-1.5 border border-gray-300 rounded text-center focus:ring-1 focus:ring-amber-500 font-medium placeholder:text-gray-300">
+                                    <span class="text-xs text-gray-600 whitespace-nowrap">% 麵粉</span>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <select id="tzRatio" class="p-1.5 border border-gray-300 rounded text-xs text-gray-700 bg-white focus:ring-1 focus:ring-amber-500 font-medium">
+                                        <option value="2">粉水比 1:2</option>
+                                        <option value="5" selected>粉水比 1:5</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="text-xs text-gray-500 bg-gray-50 px-2 py-2 rounded border border-gray-100 flex-1 text-center sm:text-right mt-1 sm:mt-0">
+                                需預備: 粉 <span id="tzFlourDisplay" class="font-bold text-gray-700">—</span> / 水 <span id="tzWaterDisplay" class="font-bold text-blue-600">—</span>
+                            </div>
+                        </div>
+
+                        <!-- 自製酵母 -->
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-3 bg-white p-3 rounded-lg border border-amber-100 shadow-sm">
+                            <div class="w-16 font-bold text-amber-900 text-sm shrink-0">自製酵母</div>
+                            <div class="flex flex-wrap items-center gap-2 shrink-0">
+                                <div class="flex items-center gap-1">
+                                    <input type="number" id="sdPercent" value="" placeholder="0" min="0" step="1" class="w-16 p-1.5 border border-gray-300 rounded text-center focus:ring-1 focus:ring-amber-500 font-medium placeholder:text-gray-300">
+                                    <span class="text-xs text-gray-600 whitespace-nowrap">% 麵粉</span>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <span class="p-1.5 text-xs text-gray-500 bg-gray-100 rounded border border-gray-200 font-medium">固定粉水比 1:1</span>
+                                </div>
+                            </div>
+                            <div class="text-xs text-gray-500 bg-gray-50 px-2 py-2 rounded border border-gray-100 flex-1 text-center sm:text-right mt-1 sm:mt-0">
+                                需預備: 粉 <span id="sdFlourDisplay" class="font-bold text-gray-700">—</span> / 水 <span id="sdWaterDisplay" class="font-bold text-blue-600">—</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 烤箱溫度與烘烤設定 (包含上下火) - 預設留白 -->
+                <div class="bg-orange-50/90 rounded-xl p-5 border border-orange-200 shadow-sm">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 border-b border-orange-200 pb-3">
+                        <div>
+                            <h2 class="text-xl font-bold text-orange-900">🔥 烤箱溫度與烘烤設定 (上下火)</h2>
+                            <p class="text-xs text-orange-700 mt-1">設定上火、下火溫度與烘烤時間，將同步顯示於配方清單與匯出圖片</p>
+                        </div>
+                        <div class="flex items-center gap-1 bg-white p-1 rounded-lg border border-orange-200 shrink-0">
+                            <button type="button" id="modeDualBtn" class="px-3 py-1 text-xs font-bold rounded-md bg-orange-600 text-white transition-colors">獨立上下火</button>
+                            <button type="button" id="modeSingleBtn" class="px-3 py-1 text-xs font-bold rounded-md text-orange-800 hover:bg-orange-100 transition-colors">單一溫度</button>
+                        </div>
+                    </div>
+
+                    <!-- 快速預設按鈕 -->
+                    <div class="mb-4">
+                        <span class="block text-xs font-bold text-orange-800 mb-2">常見品項快速帶入：</span>
+                        <div class="flex flex-wrap gap-1.5">
+                            <button type="button" class="oven-preset-btn text-xs bg-white hover:bg-orange-100 text-orange-900 border border-orange-200 rounded-lg px-2.5 py-1.5 font-medium transition-colors" data-top="170" data-bottom="210" data-time="35" data-rack="下層" data-notes="山形吐司：上色後可蓋鋁箔紙">山形吐司 170/210°C</button>
+                            <button type="button" class="oven-preset-btn text-xs bg-white hover:bg-orange-100 text-orange-900 border border-orange-200 rounded-lg px-2.5 py-1.5 font-medium transition-colors" data-top="200" data-bottom="210" data-time="32" data-rack="下層" data-notes="帶蓋吐司：高低溫穿透吐司盒">帶蓋吐司 200/210°C</button>
+                            <button type="button" class="oven-preset-btn text-xs bg-white hover:bg-orange-100 text-orange-900 border border-orange-200 rounded-lg px-2.5 py-1.5 font-medium transition-colors" data-top="190" data-bottom="170" data-time="15" data-rack="中層" data-notes="台式甜麵包/餐包：10分鐘掉頭">甜麵包 190/170°C</button>
+                            <button type="button" class="oven-preset-btn text-xs bg-white hover:bg-orange-100 text-orange-900 border border-orange-200 rounded-lg px-2.5 py-1.5 font-medium transition-colors" data-top="230" data-bottom="220" data-time="22" data-rack="中下層" data-notes="歐包/法棍：入爐噴蒸汽">歐包/法棍 230/220°C</button>
+                            <button type="button" class="oven-preset-btn text-xs bg-white hover:bg-orange-100 text-orange-900 border border-orange-200 rounded-lg px-2.5 py-1.5 font-medium transition-colors" data-top="210" data-bottom="190" data-time="18" data-rack="中層" data-notes="貝果/鹽可頌：表面金黃酥脆">貝果/鹽可頌 210/190°C</button>
+                        </div>
+                    </div>
+
+                    <!-- 上火 / 下火 / 時間 輸入區 - 預設留白 -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                        <!-- 上火 -->
+                        <div class="bg-white p-3.5 rounded-xl border border-orange-200 shadow-sm">
+                            <label for="ovenTopTemp" id="topTempLabel" class="block text-xs font-bold text-red-700 mb-1.5">🔥 上火溫度 (Top)</label>
+                            <div class="relative">
+                                <input type="number" id="ovenTopTemp" value="" placeholder="例如：190" min="0" max="350" step="5"
+                                       class="w-full text-2xl font-black text-red-700 p-2 pr-10 rounded-lg border border-orange-200 focus:ring-2 focus:ring-orange-500 outline-none text-center bg-orange-50/30 placeholder:text-gray-300 placeholder:text-base placeholder:font-normal">
+                                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">°C</span>
+                            </div>
+                        </div>
+
+                        <!-- 下火 -->
+                        <div id="bottomTempBox" class="bg-white p-3.5 rounded-xl border border-orange-200 shadow-sm">
+                            <label for="ovenBottomTemp" class="block text-xs font-bold text-amber-800 mb-1.5">🔥 下火溫度 (Bottom)</label>
+                            <div class="relative">
+                                <input type="number" id="ovenBottomTemp" value="" placeholder="例如：180" min="0" max="350" step="5"
+                                       class="w-full text-2xl font-black text-amber-800 p-2 pr-10 rounded-lg border border-orange-200 focus:ring-2 focus:ring-orange-500 outline-none text-center bg-orange-50/30 placeholder:text-gray-300 placeholder:text-base placeholder:font-normal">
+                                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">°C</span>
+                            </div>
+                        </div>
+
+                        <!-- 烘烤時間 -->
+                        <div class="bg-white p-3.5 rounded-xl border border-orange-200 shadow-sm">
+                            <label for="ovenBakeTime" class="block text-xs font-bold text-gray-700 mb-1.5">⏱️ 烘烤時間 (Time)</label>
+                            <div class="relative">
+                                <input type="number" id="ovenBakeTime" value="" placeholder="例如：20" min="1" max="240" step="1"
+                                       class="w-full text-2xl font-black text-gray-800 p-2 pr-12 rounded-lg border border-orange-200 focus:ring-2 focus:ring-orange-500 outline-none text-center bg-orange-50/30 placeholder:text-gray-300 placeholder:text-base placeholder:font-normal">
+                                <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">分鐘</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 烤盤位置與二段烤溫備註 -->
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                        <div class="sm:col-span-4">
+                            <label for="ovenRackPosition" class="block text-xs font-bold text-orange-900 mb-1">烤盤層架位置</label>
+                            <select id="ovenRackPosition" class="w-full p-2.5 rounded-lg border border-orange-200 bg-white text-sm font-bold text-gray-700 focus:ring-2 focus:ring-orange-500 outline-none">
+                                <option value="中層" selected>中層 (標準)</option>
+                                <option value="中下層">中下層 (吐司/歐包)</option>
+                                <option value="下層">下層 (高模/山形吐司)</option>
+                                <option value="上層">上層 (表面上色)</option>
+                            </select>
+                        </div>
+                        <div class="sm:col-span-8">
+                            <label for="ovenBakeNotes" class="block text-xs font-bold text-orange-900 mb-1">烘烤備註 / 二段調溫說明 (選填)</label>
+                            <input type="text" id="ovenBakeNotes" placeholder="例如：烤12分鐘掉頭、後5分鐘上火降10°C..."
+                                   class="w-full p-2.5 rounded-lg border border-orange-200 bg-white text-sm font-medium text-gray-700 focus:ring-2 focus:ring-orange-500 outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 液體材料區 - 預設留白 -->
+                <div class="bg-blue-50 rounded-xl p-5 border border-blue-200 shadow-sm">
+                    <div class="flex justify-between items-end mb-4 border-b border-blue-200 pb-3">
+                        <div>
+                            <h2 class="text-xl font-bold text-blue-900">💧 液體材料清單</h2>
+                            <p class="text-xs text-blue-700 mt-1">含水量會自動從主麵團的「純加水量」中扣除</p>
+                        </div>
+                        <button id="addLiquidBtn" class="text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-3 rounded-lg transition-colors flex items-center gap-1 shadow-sm shrink-0">
+                            新增液體
+                        </button>
+                    </div>
+                    <div id="liquidsContainer" class="space-y-3 mt-3"></div>
+                </div>
+
+                <!-- 粉狀與乾性材料列表區 - 預設留白 -->
+                <div class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+                    <div class="flex justify-between items-end mb-4 border-b border-gray-200 pb-3">
+                        <h2 class="text-xl font-bold text-gray-800">粉狀與其他乾性材料</h2>
+                        <button id="addIngredientBtn" class="text-sm bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 px-3 rounded-lg transition-colors flex items-center gap-1 shadow-sm">
+                            新增材料
+                        </button>
+                    </div>
+                    <div id="ingredientsContainer" class="space-y-3 mt-3"></div>
+                </div>
+
+            </div>
+
+            <!-- 右側總結區 (佔 5 欄) -->
+            <div class="lg:col-span-5">
+                <div class="bg-gray-50 rounded-xl p-6 border border-gray-200 sticky top-6 shadow-md flex flex-col h-auto">
+                    <h2 class="text-xl font-black text-gray-800 mb-4 border-b-2 border-amber-200 pb-2">📋 主麵團實際投料清單</h2>
+                    
+                    <div class="space-y-2 mb-4 bg-amber-50/70 p-4 rounded-xl border border-amber-100">
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-gray-600 font-medium">還原總麵粉量 (100%)</span>
+                            <span class="font-bold text-amber-800 text-lg"><span id="summaryTotalFlour">—</span></span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm border-t border-amber-200/60 pt-2">
+                            <span class="text-gray-600 font-medium">烤箱上下火設定</span>
+                            <span id="summaryOvenTemp" class="font-bold text-orange-800 text-sm">未設定烤溫</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm flex-1">
+                        <ul id="actualRecipeList" class="space-y-2.5 text-base">
+                            <!-- 動態生成的實際投料清單 -->
+                        </ul>
+                    </div>
+                    
+                    <div class="mt-4 flex justify-between items-center text-sm px-2">
+                        <span class="text-gray-800 font-bold">加總重量檢核</span>
+                        <span class="font-bold text-gray-500 text-lg"><span id="totalDoughWeight">—</span></span>
+                    </div>
+
+                    <!-- 份量分割計算 -->
+                    <div class="mt-6 pt-5 border-t-2 border-gray-200 border-dashed">
+                        <div class="flex flex-col xl:flex-row justify-between items-center gap-3">
+                            <div class="flex items-center gap-2">
+                                <label for="divideCount" class="text-sm font-bold text-gray-700 whitespace-nowrap">麵團分割成：</label>
+                                <div class="flex items-center bg-white border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-amber-500 w-24">
+                                    <input type="number" id="divideCount" value="" placeholder="1" min="1" step="1"
+                                           class="w-full p-2 text-center text-lg font-bold outline-none placeholder:text-gray-300 placeholder:font-normal">
+                                    <span class="px-2 text-sm text-gray-500 bg-gray-50 border-l border-gray-200">份</span>
+                                </div>
+                            </div>
+                            <div class="text-right whitespace-nowrap">
+                                <span class="text-sm text-gray-500">每份約</span>
+                                <span class="text-xl font-black text-amber-600 ml-1"><span id="weightPerPortion">—</span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 匯出精美配方卡按鈕 -->
+                    <div class="mt-6 pt-5 border-t border-gray-200 flex flex-col gap-3">
+                        <button id="exportImageBtn" class="bg-gradient-to-r from-amber-700 to-amber-900 hover:from-amber-800 hover:to-black text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-lg hover:shadow-xl w-full flex items-center justify-center gap-2">
+                            <span id="exportBtnText">匯出精美配方卡 (圖片)</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 用於隱藏生成配方卡的容器 -->
+    <div id="recipeCardContainer" style="position: absolute; left: -9999px; top: 0;"></div>
+
+    <script type="module">
+        const els = {
+            recipeName: document.getElementById('recipeName'),
+            targetDoughWeight: document.getElementById('targetDoughWeight'),
+            targetHydration: document.getElementById('targetHydration'),
+            tzPercent: document.getElementById('tzPercent'),
+            tzRatio: document.getElementById('tzRatio'),
+            sdPercent: document.getElementById('sdPercent'),
+            tzFlourDisplay: document.getElementById('tzFlourDisplay'),
+            tzWaterDisplay: document.getElementById('tzWaterDisplay'),
+            sdFlourDisplay: document.getElementById('sdFlourDisplay'),
+            sdWaterDisplay: document.getElementById('sdWaterDisplay'),
+            ovenTopTemp: document.getElementById('ovenTopTemp'),
+            ovenBottomTemp: document.getElementById('ovenBottomTemp'),
+            ovenBakeTime: document.getElementById('ovenBakeTime'),
+            ovenRackPosition: document.getElementById('ovenRackPosition'),
+            ovenBakeNotes: document.getElementById('ovenBakeNotes'),
+            modeDualBtn: document.getElementById('modeDualBtn'),
+            modeSingleBtn: document.getElementById('modeSingleBtn'),
+            bottomTempBox: document.getElementById('bottomTempBox'),
+            topTempLabel: document.getElementById('topTempLabel'),
+            summaryOvenTemp: document.getElementById('summaryOvenTemp'),
+            actualRecipeList: document.getElementById('actualRecipeList'),
+            liquidsContainer: document.getElementById('liquidsContainer'),
+            addLiquidBtn: document.getElementById('addLiquidBtn'),
+            ingredientsContainer: document.getElementById('ingredientsContainer'),
+            addIngredientBtn: document.getElementById('addIngredientBtn'),
+            summaryTotalFlour: document.getElementById('summaryTotalFlour'),
+            totalDoughWeight: document.getElementById('totalDoughWeight'),
+            divideCount: document.getElementById('divideCount'),
+            weightPerPortion: document.getElementById('weightPerPortion'),
+            exportImageBtn: document.getElementById('exportImageBtn'),
+            exportBtnText: document.getElementById('exportBtnText'),
+            recipeCardContainer: document.getElementById('recipeCardContainer'),
+            exportLocalBtn: document.getElementById('exportLocalBtn'),
+            importLocalInput: document.getElementById('importLocalInput'),
+            toastContainer: document.getElementById('toastContainer')
+        };
+
+        let isSingleTempMode = false;
+        let currentRecipeData = {};
+        // 預設無任何預設數字，保持空白
+        let liquidIngredients = [
+            { id: generateId(), name: '牛奶 (Milk)', percentage: '', waterContent: '', deletable: true },
+            { id: generateId(), name: '雞蛋 (Egg)', percentage: '', waterContent: '', deletable: true }
+        ];
+        let ingredients = [
+            { id: generateId(), name: '鹽 (Salt)', percentage: '', deletable: false },
+            { id: generateId(), name: '速發酵母 (Yeast)', percentage: '', deletable: false },
+            { id: generateId(), name: '糖 (Sugar)', percentage: '', deletable: true },
+            { id: generateId(), name: '奶油 (Butter)', percentage: '', deletable: true }
+        ];
+
+        function generateId() { return Math.random().toString(36).substr(2, 9); }
+
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-green-600' : 'bg-red-600';
+            toast.className = `toast-enter flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-white font-bold text-sm ${bgColor}`;
+            toast.innerHTML = `<span>${message}</span>`;
+            els.toastContainer.appendChild(toast);
+            requestAnimationFrame(() => {
+                toast.classList.remove('toast-enter');
+                toast.classList.add('toast-enter-active');
+            });
+            setTimeout(() => {
+                toast.classList.remove('toast-enter-active');
+                toast.classList.add('toast-leave-active');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function setOvenMode(singleMode) {
+            isSingleTempMode = singleMode;
+            if (singleMode) {
+                els.modeSingleBtn.className = 'px-3 py-1 text-xs font-bold rounded-md bg-orange-600 text-white transition-colors';
+                els.modeDualBtn.className = 'px-3 py-1 text-xs font-bold rounded-md text-orange-800 hover:bg-orange-100 transition-colors';
+                els.bottomTempBox.classList.add('opacity-50', 'pointer-events-none');
+                els.topTempLabel.textContent = '🔥 烤箱溫度 (上下同溫)';
+                els.ovenBottomTemp.value = els.ovenTopTemp.value;
+            } else {
+                els.modeDualBtn.className = 'px-3 py-1 text-xs font-bold rounded-md bg-orange-600 text-white transition-colors';
+                els.modeSingleBtn.className = 'px-3 py-1 text-xs font-bold rounded-md text-orange-800 hover:bg-orange-100 transition-colors';
+                els.bottomTempBox.classList.remove('opacity-50', 'pointer-events-none');
+                els.topTempLabel.textContent = '🔥 上火溫度 (Top)';
+            }
+            calculateAll();
+        }
+
+        function createLiquidRowHTML(liq) {
+            return `
+                <div class="liquid-row flex flex-col gap-3 bg-white p-4 rounded-xl border border-blue-100 hover:border-blue-300 transition-colors shadow-sm group" data-id="${liq.id}">
+                    <div class="w-full">
+                        <input type="text" value="${liq.name}" class="name-input w-full p-2.5 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-base font-medium bg-blue-50/40">
+                    </div>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex gap-2 flex-wrap">
+                            <div class="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white min-w-[130px] w-auto shadow-sm">
+                                <span class="px-3 py-2 text-gray-600 bg-gray-50 border-r border-gray-200 text-sm font-bold whitespace-nowrap">比例</span>
+                                <input type="number" value="${liq.percentage}" placeholder="0" min="0" step="0.5" class="percent-input w-16 min-w-0 text-center p-2 outline-none font-bold text-gray-800 text-base placeholder:text-gray-300">
+                                <span class="px-2 text-gray-400 bg-gray-50 border-l border-gray-200 text-xs whitespace-nowrap">%</span>
+                            </div>
+                            <div class="flex items-center border border-blue-300 rounded-lg overflow-hidden bg-blue-50 min-w-[130px] w-auto shadow-sm">
+                                <span class="px-3 py-2 text-blue-700 bg-blue-100/50 border-r border-blue-200 text-sm font-bold whitespace-nowrap">含水</span>
+                                <input type="number" value="${liq.waterContent}" placeholder="100" min="0" step="1" max="100" class="water-content-input w-16 min-w-0 text-center p-2 outline-none font-bold text-blue-800 text-base bg-transparent placeholder:text-blue-300">
+                                <span class="px-2 text-blue-500 border-l border-blue-200 text-xs whitespace-nowrap">%</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-end gap-2 shrink-0 ml-auto">
+                            <div class="text-right">
+                                <div class="font-black text-gray-800 text-lg leading-tight"><span class="weight-display">—</span> <span class="text-sm text-gray-500 font-normal">g</span></div>
+                                <div class="text-xs text-blue-600 font-medium mt-0.5">折水 <span class="water-display">—</span></div>
+                            </div>
+                            ${liq.deletable ? `<button type="button" class="delete-btn text-gray-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors shrink-0">✕</button>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function createIngredientRowHTML(ingredient) {
+            return `
+                <div class="ingredient-row flex flex-col gap-3 bg-gray-50/70 p-4 rounded-xl border border-gray-200 hover:border-amber-300 transition-colors shadow-sm group" data-id="${ingredient.id}">
+                    <div class="w-full">
+                        <input type="text" value="${ingredient.name}" class="name-input w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none text-base font-medium bg-white">
+                    </div>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white min-w-[140px] w-auto shadow-sm">
+                            <span class="px-3 py-2 text-gray-600 bg-gray-100 border-r border-gray-200 text-sm font-bold whitespace-nowrap">比例</span>
+                            <input type="number" value="${ingredient.percentage}" placeholder="0" min="0" step="0.1" class="percent-input w-20 min-w-0 text-center p-2 outline-none font-bold text-gray-800 text-base placeholder:text-gray-300">
+                            <span class="px-2.5 text-gray-400 bg-gray-100 border-l border-gray-200 text-xs whitespace-nowrap">%</span>
+                        </div>
+                        <div class="flex items-center justify-end gap-2 shrink-0 ml-auto">
+                            <div class="text-right pr-1">
+                                <span class="weight-display font-black text-gray-800 text-xl">—</span>
+                                <span class="text-gray-500 text-sm ml-0.5 font-normal">g</span>
+                            </div>
+                            ${ingredient.deletable ? `<button type="button" class="delete-btn text-gray-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors shrink-0">✕</button>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderLiquids() {
+            els.liquidsContainer.innerHTML = liquidIngredients.map(createLiquidRowHTML).join('');
+            els.liquidsContainer.querySelectorAll('.liquid-row').forEach(row => {
+                const id = row.dataset.id;
+                row.querySelector('.name-input').addEventListener('change', e => { const item = liquidIngredients.find(i => i.id === id); if (item) item.name = e.target.value; });
+                row.querySelector('.percent-input').addEventListener('input', e => { const item = liquidIngredients.find(i => i.id === id); if (item) item.percentage = e.target.value; calculateAll(); });
+                row.querySelector('.water-content-input').addEventListener('input', e => { const item = liquidIngredients.find(i => i.id === id); if (item) item.waterContent = e.target.value; calculateAll(); });
+                const delBtn = row.querySelector('.delete-btn');
+                if (delBtn) delBtn.addEventListener('click', () => { liquidIngredients = liquidIngredients.filter(i => i.id !== id); renderLiquids(); calculateAll(); });
+            });
+        }
+
+        function renderIngredients() {
+            els.ingredientsContainer.innerHTML = ingredients.map(createIngredientRowHTML).join('');
+            els.ingredientsContainer.querySelectorAll('.ingredient-row').forEach(row => {
+                const id = row.dataset.id;
+                row.querySelector('.name-input').addEventListener('change', e => { const item = ingredients.find(i => i.id === id); if (item) item.name = e.target.value; });
+                row.querySelector('.percent-input').addEventListener('input', e => { const item = ingredients.find(i => i.id === id); if (item) item.percentage = e.target.value; calculateAll(); });
+                const delBtn = row.querySelector('.delete-btn');
+                if (delBtn) delBtn.addEventListener('click', () => { ingredients = ingredients.filter(i => i.id !== id); renderIngredients(); calculateAll(); });
+            });
+        }
+
+        function calculateAll() {
+            if (isSingleTempMode) {
+                els.ovenBottomTemp.value = els.ovenTopTemp.value;
+            }
+            const topTempStr = els.ovenTopTemp.value;
+            const bottomTempStr = els.ovenBottomTemp.value;
+            const bakeTimeStr = els.ovenBakeTime.value;
+            const rackPos = els.ovenRackPosition.value || '中層';
+
+            let ovenText = '未設定烤溫';
+            if (topTempStr !== '' || bottomTempStr !== '') {
+                ovenText = isSingleTempMode
+                    ? `全火 ${topTempStr || '—'}°C · ${bakeTimeStr || '—'}分 (${rackPos})`
+                    : `上火 ${topTempStr || '—'}°C / 下火 ${bottomTempStr || '—'}°C · ${bakeTimeStr || '—'}分 (${rackPos})`;
+            }
+            els.summaryOvenTemp.textContent = ovenText;
+
+            let targetDoughWeight = parseFloat(els.targetDoughWeight.value) || 0;
+            let targetHydration = parseFloat(els.targetHydration.value) || 0;
+
+            if (targetDoughWeight <= 0) {
+                els.summaryTotalFlour.textContent = '—';
+                els.totalDoughWeight.textContent = '—';
+                els.weightPerPortion.textContent = '—';
+                els.tzFlourDisplay.textContent = '—';
+                els.tzWaterDisplay.textContent = '—';
+                els.sdFlourDisplay.textContent = '—';
+                els.sdWaterDisplay.textContent = '—';
+                els.actualRecipeList.innerHTML = `<li class="text-center py-6 text-gray-400 text-sm">請輸入目標麵團總重量與水合率</li>`;
+                els.liquidsContainer.querySelectorAll('.liquid-row').forEach(row => {
+                    row.querySelector('.weight-display').textContent = '—';
+                    row.querySelector('.water-display').textContent = '—';
+                });
+                els.ingredientsContainer.querySelectorAll('.ingredient-row').forEach(row => {
+                    row.querySelector('.weight-display').textContent = '—';
+                });
+                return;
+            }
+
+            let dryPercentage = 0;
+            ingredients.forEach(ing => dryPercentage += (parseFloat(ing.percentage) || 0));
+
+            let liquidSolidPercentage = 0;
+            liquidIngredients.forEach(liq => {
+                const lp = parseFloat(liq.percentage) || 0;
+                const wc = liq.waterContent === '' ? 100 : (parseFloat(liq.waterContent) || 0);
+                liquidSolidPercentage += lp * (1 - (wc / 100));
+            });
+
+            let totalPercentage = 100 + targetHydration + dryPercentage + liquidSolidPercentage;
+            let totalFlourWeight = targetDoughWeight / (totalPercentage / 100);
+            let totalWaterWeight = (totalFlourWeight * targetHydration) / 100;
+
+            let tzPercent = parseFloat(els.tzPercent.value) || 0;
+            let tzRatio = parseInt(els.tzRatio.value) || 5;
+            let sdPercent = parseFloat(els.sdPercent.value) || 0;
+
+            let tzFlourWeight = (totalFlourWeight * tzPercent) / 100;
+            let tzWaterWeight = tzFlourWeight * tzRatio;
+            let tzTotalWeight = tzFlourWeight + tzWaterWeight;
+
+            let sdFlourWeight = (totalFlourWeight * sdPercent) / 100;
+            let sdWaterWeight = sdFlourWeight * 1;
+            let sdTotalWeight = sdFlourWeight + sdWaterWeight;
+
+            els.tzFlourDisplay.textContent = tzFlourWeight > 0 ? Number(tzFlourWeight.toFixed(1)) + 'g' : '—';
+            els.tzWaterDisplay.textContent = tzWaterWeight > 0 ? Number(tzWaterWeight.toFixed(1)) + 'g' : '—';
+            els.sdFlourDisplay.textContent = sdFlourWeight > 0 ? Number(sdFlourWeight.toFixed(1)) + 'g' : '—';
+            els.sdWaterDisplay.textContent = sdWaterWeight > 0 ? Number(sdWaterWeight.toFixed(1)) + 'g' : '—';
+
+            let mainRecipeItems = [];
+            let totalWeight = totalFlourWeight + totalWaterWeight; 
+            let liquidProvidedWater = 0;
+            let ingredientExportData = []; 
+
+            els.liquidsContainer.querySelectorAll('.liquid-row').forEach(row => {
+                const id = row.dataset.id;
+                const liq = liquidIngredients.find(i => i.id === id);
+                if (liq) {
+                    const lp = parseFloat(liq.percentage) || 0;
+                    const wc = liq.waterContent === '' ? 100 : (parseFloat(liq.waterContent) || 0);
+                    const totalLiqWeight = (totalFlourWeight * lp) / 100;
+                    const waterInLiq = totalLiqWeight * (wc / 100);
+                    const solidInLiq = totalLiqWeight - waterInLiq;
+                    row.querySelector('.weight-display').textContent = totalLiqWeight > 0 ? Number(totalLiqWeight.toFixed(1)) : '—';
+                    row.querySelector('.water-display').textContent = waterInLiq > 0 ? Number(waterInLiq.toFixed(1)) + 'g' : '—';
+                    totalWeight += solidInLiq; 
+                    liquidProvidedWater += waterInLiq;
+                    if (totalLiqWeight > 0) {
+                        mainRecipeItems.push({ name: liq.name, weight: totalLiqWeight, color: 'text-blue-800' });
+                        ingredientExportData.push({ name: liq.name, percent: lp, note: `(水${wc}%)` });
+                    }
+                }
+            });
+
+            let mainDoughFlourWeight = totalFlourWeight - tzFlourWeight - sdFlourWeight;
+            let prefWaterRemaining = tzWaterWeight + sdWaterWeight;
+            let mainDoughWaterWeight = totalWaterWeight - prefWaterRemaining - liquidProvidedWater;
+
+            if (mainDoughFlourWeight > 0) {
+                mainRecipeItems.unshift({ name: '主麵團高筋麵粉', weight: mainDoughFlourWeight, color: 'text-amber-900', isMain: true });
+            }
+            if (mainDoughWaterWeight > 0) {
+                mainRecipeItems.splice(1, 0, { name: '主麵團純加水量', weight: mainDoughWaterWeight, color: 'text-blue-600', isMain: true });
+            }
+            if (tzTotalWeight > 0) mainRecipeItems.push({ name: '湯種 (預先製作)', weight: tzTotalWeight, color: 'text-orange-700', isPref: true });
+            if (sdTotalWeight > 0) mainRecipeItems.push({ name: '自製酵母 (預先餵養)', weight: sdTotalWeight, color: 'text-orange-700', isPref: true });
+
+            els.ingredientsContainer.querySelectorAll('.ingredient-row').forEach(row => {
+                const id = row.dataset.id;
+                const ing = ingredients.find(i => i.id === id);
+                if (ing) {
+                    const ip = parseFloat(ing.percentage) || 0;
+                    const totalIngWeight = (totalFlourWeight * ip) / 100;
+                    row.querySelector('.weight-display').textContent = totalIngWeight > 0 ? Number(totalIngWeight.toFixed(1)) : '—';
+                    totalWeight += totalIngWeight; 
+                    if (totalIngWeight > 0) {
+                        mainRecipeItems.push({ name: ing.name, weight: totalIngWeight, color: 'text-gray-800' });
+                        ingredientExportData.push({ name: ing.name, percent: ip, note: '' });
+                    }
+                }
+            });
+
+            els.summaryTotalFlour.textContent = Number(totalFlourWeight.toFixed(1)) + ' g';
+            els.totalDoughWeight.textContent = Number(totalWeight.toFixed(1)) + ' g';
+
+            els.actualRecipeList.innerHTML = '';
+            if (mainRecipeItems.length === 0) {
+                els.actualRecipeList.innerHTML = `<li class="text-center py-6 text-gray-400 text-sm">請輸入各材料烘焙百分比</li>`;
+            } else {
+                mainRecipeItems.forEach(item => {
+                    let boldClass = item.isMain || item.isPref ? 'font-bold' : 'font-medium';
+                    els.actualRecipeList.insertAdjacentHTML('beforeend', `
+                        <li class="flex justify-between items-center py-2.5 border-b border-gray-100 last:border-0 hover:bg-gray-50 px-2 rounded transition-colors">
+                            <span class="text-gray-700 ${boldClass}">${item.name}</span>
+                            <span class="font-black text-lg ${item.color}">${Number(item.weight.toFixed(1))} <span class="text-sm font-normal text-gray-400">g</span></span>
+                        </li>
+                    `);
+                });
+            }
+
+            let divideCount = parseInt(els.divideCount.value) || 1;
+            const perPortion = totalWeight / divideCount;
+            els.weightPerPortion.textContent = Number(perPortion.toFixed(1)) + ' g';
+        }
+
+        function init() {
+            renderLiquids();
+            renderIngredients();
+            ['targetDoughWeight', 'targetHydration', 'tzPercent', 'tzRatio', 'sdPercent', 'divideCount', 'ovenTopTemp', 'ovenBottomTemp', 'ovenBakeTime', 'ovenRackPosition', 'ovenBakeNotes'].forEach(id => {
+                document.getElementById(id).addEventListener('input', calculateAll);
+            });
+            els.tzRatio.addEventListener('change', calculateAll);
+            els.ovenRackPosition.addEventListener('change', calculateAll);
+            els.modeDualBtn.addEventListener('click', () => setOvenMode(false));
+            els.modeSingleBtn.addEventListener('click', () => setOvenMode(true));
+
+            document.querySelectorAll('.oven-preset-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    setOvenMode(false);
+                    els.ovenTopTemp.value = btn.dataset.top;
+                    els.ovenBottomTemp.value = btn.dataset.bottom;
+                    els.ovenBakeTime.value = btn.dataset.time;
+                    els.ovenRackPosition.value = btn.dataset.rack;
+                    els.ovenBakeNotes.value = btn.dataset.notes;
+                    calculateAll();
+                    showToast(`已套用烤溫：上火 ${btn.dataset.top}°C / 下火 ${btn.dataset.bottom}°C`);
+                });
+            });
+
+            els.addLiquidBtn.addEventListener('click', () => {
+                liquidIngredients.push({ id: generateId(), name: '新液體', percentage: '', waterContent: '', deletable: true });
+                renderLiquids(); calculateAll();
+            });
+            els.addIngredientBtn.addEventListener('click', () => {
+                ingredients.push({ id: generateId(), name: '新材料', percentage: '', deletable: true });
+                renderIngredients(); calculateAll();
+            });
+            calculateAll();
+        }
+        init();
+    </script>
+</body>
+</html>

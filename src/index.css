@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Noto Sans TC', sans-serif;
+    background-color: #fdfbf7;
+    color: #1f2937;
+  }
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type="number"] {
+    -moz-appearance: textfield;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}

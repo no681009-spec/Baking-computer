@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>烘焙百分比計算器 — 含上下火烤箱溫度設定</title>
+    <meta name="description" content="以麵粉總量為 100% 精準換算的烘焙材料與上下火烤箱溫度計算工具，支援湯種、魯邦種、液體折水、上下火烤溫與精美配方卡匯出。" />
+    <meta property="og:title" content="烘焙百分比計算器 — 含上下火烤箱溫度設定" />
+    <meta property="og:description" content="以麵粉總量為 100% 精準換算的烘焙材料與上下火烤箱溫度計算工具，支援湯種、魯邦種、液體折水、上下火烤溫與精美配方卡匯出。" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // 防呆機制：若使用者直接將原始碼未經編譯部署至靜態空間 (如 GitHub Pages)，自動載入單頁完整版避免空白畫面
+      window.addEventListener('load', function () {
+        setTimeout(function () {
+          var root = document.getElementById('root');
+          if (root && root.children.length === 0) {
+            fetch('./public/assets/aistudio/index_b872a86c.html')
+              .then(function (res) {
+                if (res.ok) return res.text();
+                return fetch('./assets/aistudio/index_b872a86c.html').then(function (r2) {
+                  return r2.ok ? r2.text() : null;
+                });
+              })
+              .then(function (html) {
+                if (html && root.children.length === 0) {
+                  document.open();
+                  document.write(html);
+                  document.close();
+                }
+              })
+              .catch(function () {});
+          }
+        }, 600);
+      });
+    </script>
+  </body>
+</html>

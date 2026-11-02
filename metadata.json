@@ -1,0 +1,6 @@
+{
+  "name": "烘焙百分比計算器",
+  "description": "以麵粉總量為 100% 精準換算的烘焙材料與上下火烤箱溫度計算工具",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
