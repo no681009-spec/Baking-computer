@@ -514,10 +514,6 @@ export default function App() {
 
   // 儲存配方至配方簿
   const handleSaveToBook = () => {
-    if (!calc.hasDoughWeight) {
-      showToast('請先輸入目標麵團重量', 'error');
-      return;
-    }
     if (calc.waterWarning || calc.flourWarning) {
       showToast('配方比例設定有誤，請修正後再儲存', 'error');
       return;
@@ -570,6 +566,7 @@ export default function App() {
     } else if (recipe.topTemp !== undefined || recipe.bottomTemp !== undefined) {
       setOven(prev => ({
         ...prev,
+        mode: recipe.isSingleTempMode ? 'single' : 'dual',
         topTemp: recipe.topTemp ?? '',
         bottomTemp: recipe.bottomTemp ?? '',
         bakeTime: recipe.bakeTime ?? '',
@@ -596,19 +593,15 @@ export default function App() {
   };
 
   // 下載 JSON 配方檔
-  const handleExportJson = () => {
-    if (!calc.hasDoughWeight) {
-      showToast('請先輸入目標麵團重量再匯出', 'error');
-      return;
-    }
+  const handleExportJson = async () => {
     if (calc.waterWarning || calc.flourWarning) {
       showToast('配方比例設定有誤，請修正後再匯出', 'error');
       return;
     }
 
-    const name = recipeName.trim() || '未命名配方';
+    const name = (recipeName.trim() || '未命名配方').replace(/[\\/:*?"<>|]/g, '');
     const payload = {
-      recipeName: name,
+      recipeName: recipeName.trim() || '未命名配方',
       targetDoughWeight,
       targetHydration,
       tzPercent,
@@ -621,20 +614,63 @@ export default function App() {
       bakeTime: oven.bakeTime,
       rackPosition: oven.rackPosition,
       bakeNotes: oven.notes,
+      isSingleTempMode: oven.mode === 'single',
       liquidIngredients: JSON.stringify(liquidIngredients),
       ingredients: JSON.stringify(ingredients)
     };
 
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${name}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    showToast(`已下載配方檔「${name}.json」`);
+    const fileContent = JSON.stringify(payload, null, 2);
+    const defaultFileName = `${name}.json`;
+
+    // 優先嘗試使用瀏覽器選擇儲存位置 API，若在 iframe 內受限則自動退回一般下載
+    const win = window as Window & {
+      showSaveFilePicker?: (options?: unknown) => Promise<{
+        createWritable: () => Promise<{
+          write: (data: string) => Promise<void>;
+          close: () => Promise<void>;
+        }>;
+      }>;
+    };
+
+    if (typeof win.showSaveFilePicker === 'function') {
+      try {
+        const handle = await win.showSaveFilePicker({
+          suggestedName: defaultFileName,
+          types: [
+            {
+              description: 'JSON 配方檔',
+              accept: { 'application/json': ['.json'] }
+            }
+          ]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(fileContent);
+        await writable.close();
+        showToast(`配方檔「${defaultFileName}」儲存成功！`);
+        return;
+      } catch (err: any) {
+        if (err?.name === 'AbortError') {
+          return; // 使用者取消儲存視窗
+        }
+        // 若為 SecurityError (如 iframe 限制) 或其他錯誤，自動退回下方傳統下載方式
+      }
+    }
+
+    try {
+      const blob = new Blob([fileContent], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = defaultFileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast(`已下載配方檔「${defaultFileName}」`);
+    } catch (error) {
+      console.error('Export JSON error:', error);
+      showToast('下載配方檔失敗，請重試', 'error');
+    }
   };
 
   // 下載單頁獨立版 HTML (可直接部署或離線開啟，免編譯)
