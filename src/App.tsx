@@ -1826,8 +1826,8 @@ export default function App() {
         <div
           ref={captureCardRef}
           style={{
-            width: '540px',
-            padding: '32px',
+            width: '620px',
+            padding: '36px',
             backgroundColor: '#fdfbf7',
             fontFamily: "'Noto Sans TC', sans-serif",
             position: 'relative',
@@ -1837,31 +1837,31 @@ export default function App() {
           <div
             style={{
               position: 'absolute',
-              top: '14px',
-              bottom: '14px',
-              left: '14px',
-              right: '14px',
-              border: '2px solid #b45309',
-              borderRadius: '14px',
+              top: '16px',
+              bottom: '16px',
+              left: '16px',
+              right: '16px',
+              border: '3px solid #b45309',
+              borderRadius: '16px',
               pointerEvents: 'none'
             }}
           />
 
-          <div style={{ position: 'relative', zIndex: 10, padding: '18px' }}>
+          <div style={{ position: 'relative', zIndex: 10, padding: '22px' }}>
             {/* 標題 */}
-            <div style={{ textAlign: 'center', marginBottom: '22px' }}>
+            <div style={{ textAlign: 'center', marginBottom: '26px' }}>
               <div
                 style={{
-                  fontSize: '26px',
+                  fontSize: '34px',
                   fontWeight: 900,
                   color: '#92400e',
-                  marginBottom: '4px',
+                  marginBottom: '6px',
                   lineHeight: 1.3
                 }}
               >
                 🍞 {recipeName.trim() || '專屬烘焙配方'}
               </div>
-              <div style={{ fontSize: '13px', color: '#6b7280', fontWeight: 500 }}>
+              <div style={{ fontSize: '17px', color: '#6b7280', fontWeight: 700 }}>
                 烘焙百分比與上下火烤溫配方卡
               </div>
             </div>
@@ -1872,35 +1872,56 @@ export default function App() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 backgroundColor: '#fffbeb',
-                padding: '14px 18px',
-                borderRadius: '12px',
-                marginBottom: '14px',
-                border: '1px solid #fde68a'
+                padding: '18px 20px',
+                borderRadius: '14px',
+                marginBottom: '18px',
+                border: '1.5px solid #fde68a'
               }}
             >
               <div style={{ textAlign: 'center', flex: 1 }}>
-                <div style={{ fontSize: '11px', color: '#92400e', marginBottom: '3px' }}>
+                <div
+                  style={{
+                    fontSize: '15px',
+                    fontWeight: 700,
+                    color: '#92400e',
+                    marginBottom: '6px'
+                  }}
+                >
                   總麵粉量 (100%)
                 </div>
-                <div style={{ fontSize: '18px', fontWeight: 900, color: '#78350f' }}>
+                <div style={{ fontSize: '26px', fontWeight: 900, color: '#78350f' }}>
                   {calc.totalFlourWeight > 0 ? `${Number(calc.totalFlourWeight.toFixed(1))}g` : '—'}
                 </div>
               </div>
-              <div style={{ width: '1px', backgroundColor: '#fcd34d' }} />
+              <div style={{ width: '1.5px', backgroundColor: '#fcd34d' }} />
               <div style={{ textAlign: 'center', flex: 1 }}>
-                <div style={{ fontSize: '11px', color: '#92400e', marginBottom: '3px' }}>
+                <div
+                  style={{
+                    fontSize: '15px',
+                    fontWeight: 700,
+                    color: '#92400e',
+                    marginBottom: '6px'
+                  }}
+                >
                   目標水合率
                 </div>
-                <div style={{ fontSize: '18px', fontWeight: 900, color: '#1e3a8a' }}>
+                <div style={{ fontSize: '26px', fontWeight: 900, color: '#1e3a8a' }}>
                   {targetHydration !== '' ? `${targetHydration}%` : '—'}
                 </div>
               </div>
-              <div style={{ width: '1px', backgroundColor: '#fcd34d' }} />
+              <div style={{ width: '1.5px', backgroundColor: '#fcd34d' }} />
               <div style={{ textAlign: 'center', flex: 1 }}>
-                <div style={{ fontSize: '11px', color: '#92400e', marginBottom: '3px' }}>
+                <div
+                  style={{
+                    fontSize: '15px',
+                    fontWeight: 700,
+                    color: '#92400e',
+                    marginBottom: '6px'
+                  }}
+                >
                   麵團總重量
                 </div>
-                <div style={{ fontSize: '18px', fontWeight: 900, color: '#065f46' }}>
+                <div style={{ fontSize: '26px', fontWeight: 900, color: '#065f46' }}>
                   {calc.totalWeight > 0 ? `${Number(calc.totalWeight.toFixed(1))}g` : '—'}
                 </div>
               </div>
@@ -1910,10 +1931,10 @@ export default function App() {
             <div
               style={{
                 backgroundColor: '#fff7ed',
-                border: '1px solid #fed7aa',
-                borderRadius: '12px',
-                padding: '14px 16px',
-                marginBottom: '22px'
+                border: '1.5px solid #fed7aa',
+                borderRadius: '14px',
+                padding: '18px 20px',
+                marginBottom: '26px'
               }}
             >
               <div
@@ -1921,13 +1942,13 @@ export default function App() {
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  marginBottom: '8px'
+                  marginBottom: '12px'
                 }}
               >
-                <span style={{ fontSize: '13px', fontWeight: 800, color: '#9a3412' }}>
+                <span style={{ fontSize: '18px', fontWeight: 900, color: '#9a3412' }}>
                   🔥 烤箱溫度設定 ({oven.mode === 'dual' ? '獨立上下火' : '單一溫度'})
                 </span>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: '#c2410c' }}>
+                <span style={{ fontSize: '16px', fontWeight: 700, color: '#c2410c' }}>
                   {oven.rackPosition} · {oven.assistMode}
                 </span>
               </div>
@@ -1937,32 +1958,61 @@ export default function App() {
                   display: 'flex',
                   justifyContent: 'space-between',
                   backgroundColor: '#ffffff',
-                  borderRadius: '8px',
-                  padding: '10px 12px',
-                  border: '1px solid #ffedd5'
+                  borderRadius: '10px',
+                  padding: '14px 16px',
+                  border: '1.5px solid #ffedd5'
                 }}
               >
                 <div style={{ textAlign: 'center', flex: 1 }}>
-                  <div style={{ fontSize: '11px', color: '#6b7280' }}>上火 (Top)</div>
-                  <div style={{ fontSize: '18px', fontWeight: 900, color: '#b91c1c' }}>
+                  <div
+                    style={{
+                      fontSize: '15px',
+                      fontWeight: 700,
+                      color: '#6b7280',
+                      marginBottom: '4px'
+                    }}
+                  >
+                    上火 (Top)
+                  </div>
+                  <div style={{ fontSize: '26px', fontWeight: 900, color: '#b91c1c' }}>
                     {oven.topTemp !== '' ? `${oven.topTemp}°C` : '—'}
                   </div>
                 </div>
-                <div style={{ width: '1px', backgroundColor: '#fed7aa' }} />
+                <div style={{ width: '1.5px', backgroundColor: '#fed7aa' }} />
                 <div style={{ textAlign: 'center', flex: 1 }}>
-                  <div style={{ fontSize: '11px', color: '#6b7280' }}>下火 (Bottom)</div>
-                  <div style={{ fontSize: '18px', fontWeight: 900, color: '#92400e' }}>
+                  <div
+                    style={{
+                      fontSize: '15px',
+                      fontWeight: 700,
+                      color: '#6b7280',
+                      marginBottom: '4px'
+                    }}
+                  >
+                    下火 (Bottom)
+                  </div>
+                  <div style={{ fontSize: '26px', fontWeight: 900, color: '#92400e' }}>
                     {oven.mode === 'dual'
-                      ? (oven.bottomTemp !== '' ? `${oven.bottomTemp}°C` : '—')
-                      : (oven.topTemp !== '' ? `${oven.topTemp}°C` : '—')}
+                      ? oven.bottomTemp !== ''
+                        ? `${oven.bottomTemp}°C`
+                        : '—'
+                      : oven.topTemp !== ''
+                        ? `${oven.topTemp}°C`
+                        : '—'}
                   </div>
                 </div>
-                <div style={{ width: '1px', backgroundColor: '#fed7aa' }} />
+                <div style={{ width: '1.5px', backgroundColor: '#fed7aa' }} />
                 <div style={{ textAlign: 'center', flex: 1 }}>
-                  <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                  <div
+                    style={{
+                      fontSize: '15px',
+                      fontWeight: 700,
+                      color: '#6b7280',
+                      marginBottom: '4px'
+                    }}
+                  >
                     {oven.enableStage2 ? '前段時間' : '烘烤時間'}
                   </div>
-                  <div style={{ fontSize: '18px', fontWeight: 900, color: '#1f2937' }}>
+                  <div style={{ fontSize: '26px', fontWeight: 900, color: '#1f2937' }}>
                     {oven.bakeTime !== '' ? `${oven.bakeTime} 分鐘` : '—'}
                   </div>
                 </div>
@@ -1971,9 +2021,9 @@ export default function App() {
               {oven.enableStage2 && (
                 <div
                   style={{
-                    marginTop: '8px',
-                    fontSize: '12px',
-                    fontWeight: 700,
+                    marginTop: '12px',
+                    fontSize: '16px',
+                    fontWeight: 800,
                     color: '#9a3412',
                     display: 'flex',
                     justifyContent: 'space-between'
@@ -1983,9 +2033,13 @@ export default function App() {
                   <span>
                     上火 {oven.stage2TopTemp !== '' ? `${oven.stage2TopTemp}°C` : '—'} / 下火{' '}
                     {oven.mode === 'dual'
-                      ? (oven.stage2BottomTemp !== '' ? `${oven.stage2BottomTemp}°C` : '—')
-                      : (oven.stage2TopTemp !== '' ? `${oven.stage2TopTemp}°C` : '—')} ·{' '}
-                    {oven.stage2BakeTime !== '' ? `${oven.stage2BakeTime} 分鐘` : '—'}
+                      ? oven.stage2BottomTemp !== ''
+                        ? `${oven.stage2BottomTemp}°C`
+                        : '—'
+                      : oven.stage2TopTemp !== ''
+                        ? `${oven.stage2TopTemp}°C`
+                        : '—'}{' '}
+                    · {oven.stage2BakeTime !== '' ? `${oven.stage2BakeTime} 分鐘` : '—'}
                   </span>
                 </div>
               )}
@@ -1993,8 +2047,9 @@ export default function App() {
               {oven.notes.trim() && (
                 <div
                   style={{
-                    marginTop: '6px',
-                    fontSize: '12px',
+                    marginTop: '10px',
+                    fontSize: '16px',
+                    fontWeight: 600,
                     color: '#7c2d12'
                   }}
                 >
@@ -2004,15 +2059,15 @@ export default function App() {
             </div>
 
             {/* 實際投料清單 */}
-            <div style={{ marginBottom: '20px' }}>
+            <div style={{ marginBottom: '24px' }}>
               <div
                 style={{
-                  fontSize: '15px',
+                  fontSize: '22px',
                   fontWeight: 900,
                   color: '#1f2937',
-                  marginBottom: '8px',
-                  borderBottom: '2px solid #e5e7eb',
-                  paddingBottom: '6px'
+                  marginBottom: '12px',
+                  borderBottom: '2.5px solid #e5e7eb',
+                  paddingBottom: '10px'
                 }}
               >
                 📋 主麵團實際投料
@@ -2024,22 +2079,23 @@ export default function App() {
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
-                      padding: '10px 0',
-                      borderBottom: '1px dashed #e5e7eb'
+                      alignItems: 'center',
+                      padding: '14px 0',
+                      borderBottom: '1.5px dashed #e5e7eb'
                     }}
                   >
                     <span
                       style={{
-                        fontSize: '15px',
+                        fontSize: '21px',
                         color: '#374151',
-                        fontWeight: item.isMain || item.isPref ? 700 : 500
+                        fontWeight: item.isMain || item.isPref ? 800 : 600
                       }}
                     >
                       {item.name}
                     </span>
-                    <span style={{ fontSize: '17px', fontWeight: 900, color: item.hexColor }}>
+                    <span style={{ fontSize: '24px', fontWeight: 900, color: item.hexColor }}>
                       {Number(item.weight.toFixed(1))}{' '}
-                      <span style={{ fontSize: '13px', fontWeight: 400, color: '#9ca3af' }}>
+                      <span style={{ fontSize: '17px', fontWeight: 500, color: '#9ca3af' }}>
                         g
                       </span>
                     </span>
@@ -2050,13 +2106,13 @@ export default function App() {
               {calc.portions > 1 && (
                 <div
                   style={{
-                    marginTop: '14px',
-                    padding: '10px',
+                    marginTop: '18px',
+                    padding: '14px',
                     backgroundColor: '#fef3c7',
-                    borderRadius: '8px',
-                    fontSize: '13px',
+                    borderRadius: '10px',
+                    fontSize: '18px',
                     color: '#92400e',
-                    fontWeight: 700,
+                    fontWeight: 800,
                     textAlign: 'center'
                   }}
                 >
@@ -2067,18 +2123,18 @@ export default function App() {
 
             {/* 材料比例設定 */}
             {calc.ingredientExportData.length > 0 && (
-              <div style={{ marginTop: '18px' }}>
+              <div style={{ marginTop: '22px' }}>
                 <div
                   style={{
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    color: '#6b7280',
-                    marginBottom: '6px'
+                    fontSize: '16px',
+                    fontWeight: 800,
+                    color: '#4b5563',
+                    marginBottom: '8px'
                   }}
                 >
                   材料烘焙百分比設定：
                 </div>
-                <div style={{ fontSize: '12px', color: '#4b5563', lineHeight: 1.7 }}>
+                <div style={{ fontSize: '16px', color: '#374151', lineHeight: 1.8 }}>
                   {calc.ingredientExportData.map((p, i) => (
                     <span key={i}>
                       {i > 0 && ' · '}
@@ -2091,10 +2147,11 @@ export default function App() {
 
             <div
               style={{
-                marginTop: '28px',
+                marginTop: '30px',
                 textAlign: 'center',
-                fontSize: '10px',
-                color: '#9ca3af'
+                fontSize: '13px',
+                color: '#9ca3af',
+                fontWeight: 500
               }}
             >
               匯出日期: {new Date().toLocaleDateString('zh-TW')} · 烘焙百分比計算器

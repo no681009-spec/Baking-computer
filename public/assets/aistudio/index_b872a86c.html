@@ -783,87 +783,87 @@
 
             try {
                 let itemsHtml = (currentRecipeData.items || []).map(item => `
-                    <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px dashed #e5e7eb;">
-                        <span style="font-size: 16px; color: #374151; font-weight: ${item.isMain || item.isPref ? '700' : '500'};">${item.name}</span>
-                        <span style="font-size: 18px; font-weight: 900; color: #1f2937;">${Number(item.weight.toFixed(1))} <span style="font-size: 14px; font-weight: normal; color: #9ca3af;">g</span></span>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1.5px dashed #e5e7eb;">
+                        <span style="font-size: 21px; color: #374151; font-weight: ${item.isMain || item.isPref ? '800' : '600'};">${item.name}</span>
+                        <span style="font-size: 24px; font-weight: 900; color: #1f2937;">${Number(item.weight.toFixed(1))} <span style="font-size: 17px; font-weight: 500; color: #9ca3af;">g</span></span>
                     </div>
                 `).join('');
 
                 let percentageHtml = (currentRecipeData.percentages || []).map(p => `
-                    <div style="display: inline-block; background-color: #f3f4f6; padding: 4px 10px; border-radius: 6px; font-size: 12px; color: #4b5563; margin: 4px 4px 0 0;">
-                        ${p.name}: <span style="font-weight: 700;">${p.percent}%</span> <span style="color:#9ca3af">${p.note}</span>
+                    <div style="display: inline-block; background-color: #f3f4f6; padding: 6px 12px; border-radius: 8px; font-size: 16px; color: #374151; margin: 5px 5px 0 0;">
+                        ${p.name}: <span style="font-weight: 800;">${p.percent}%</span> <span style="color:#6b7280">${p.note}</span>
                     </div>
                 `).join('');
 
                 let divideHtml = currentRecipeData.divideCount > 1 
-                    ? `<div style="margin-top: 15px; padding: 12px; background-color: #fef3c7; border-radius: 8px; font-size: 14px; color: #92400e; font-weight: bold; text-align: center;">
+                    ? `<div style="margin-top: 18px; padding: 14px; background-color: #fef3c7; border-radius: 10px; font-size: 18px; color: #92400e; font-weight: 800; text-align: center;">
                            麵團分割：${currentRecipeData.divideCount} 份 / 每份約 ${currentRecipeData.perPortion} g
                        </div>` : '';
 
                 const cardTemplate = `
-                    <div id="captureArea" style="width: 500px; padding: 30px; background-color: #fdfbf7; font-family: 'Noto Sans TC', sans-serif; position: relative;">
-                        <div style="position: absolute; top: 15px; bottom: 15px; left: 15px; right: 15px; border: 2px solid #b45309; border-radius: 12px; pointer-events: none;"></div>
+                    <div id="captureArea" style="width: 620px; padding: 36px; background-color: #fdfbf7; font-family: 'Noto Sans TC', sans-serif; position: relative;">
+                        <div style="position: absolute; top: 16px; bottom: 16px; left: 16px; right: 16px; border: 3px solid #b45309; border-radius: 16px; pointer-events: none;"></div>
                         
-                        <div style="position: relative; z-index: 10; padding: 20px;">
-                            <div style="text-align: center; margin-bottom: 22px;">
-                                <div style="font-size: 26px; font-weight: 900; color: #92400e; margin-bottom: 5px; line-height: 1.3;">🍞 ${currentRecipeData.name}</div>
-                                <div style="font-size: 14px; color: #6b7280; font-weight: 500;">烘焙百分比與上下火烤溫配方卡</div>
+                        <div style="position: relative; z-index: 10; padding: 22px;">
+                            <div style="text-align: center; margin-bottom: 26px;">
+                                <div style="font-size: 34px; font-weight: 900; color: #92400e; margin-bottom: 6px; line-height: 1.3;">🍞 ${currentRecipeData.name}</div>
+                                <div style="font-size: 17px; color: #6b7280; font-weight: 700;">烘焙百分比與上下火烤溫配方卡</div>
                             </div>
                             
-                            <div style="display: flex; justify-content: space-between; background-color: #fffbeb; padding: 15px; border-radius: 12px; margin-bottom: 14px; border: 1px solid #fde68a;">
+                            <div style="display: flex; justify-content: space-between; background-color: #fffbeb; padding: 18px 20px; border-radius: 14px; margin-bottom: 18px; border: 1.5px solid #fde68a;">
                                 <div style="text-align: center; flex: 1;">
-                                    <div style="font-size: 11px; color: #92400e; margin-bottom: 4px;">總麵粉量</div>
-                                    <div style="font-size: 18px; font-weight: 900; color: #78350f;">${currentRecipeData.totalFlour}g</div>
+                                    <div style="font-size: 15px; font-weight: 700; color: #92400e; margin-bottom: 6px;">總麵粉量</div>
+                                    <div style="font-size: 26px; font-weight: 900; color: #78350f;">${currentRecipeData.totalFlour}g</div>
                                 </div>
-                                <div style="width: 1px; background-color: #fcd34d;"></div>
+                                <div style="width: 1.5px; background-color: #fcd34d;"></div>
                                 <div style="text-align: center; flex: 1;">
-                                    <div style="font-size: 11px; color: #92400e; margin-bottom: 4px;">目標水合率</div>
-                                    <div style="font-size: 18px; font-weight: 900; color: #1e3a8a;">${currentRecipeData.hydration || 0}%</div>
+                                    <div style="font-size: 15px; font-weight: 700; color: #92400e; margin-bottom: 6px;">目標水合率</div>
+                                    <div style="font-size: 26px; font-weight: 900; color: #1e3a8a;">${currentRecipeData.hydration || 0}%</div>
                                 </div>
-                                <div style="width: 1px; background-color: #fcd34d;"></div>
+                                <div style="width: 1.5px; background-color: #fcd34d;"></div>
                                 <div style="text-align: center; flex: 1;">
-                                    <div style="font-size: 11px; color: #92400e; margin-bottom: 4px;">總重量約</div>
-                                    <div style="font-size: 18px; font-weight: 900; color: #065f46;">${currentRecipeData.finalWeight}g</div>
+                                    <div style="font-size: 15px; font-weight: 700; color: #92400e; margin-bottom: 6px;">總重量約</div>
+                                    <div style="font-size: 26px; font-weight: 900; color: #065f46;">${currentRecipeData.finalWeight}g</div>
                                 </div>
                             </div>
 
-                            <div style="background-color: #fff7ed; border: 1px solid #fed7aa; border-radius: 12px; padding: 14px; margin-bottom: 22px;">
-                                <div style="font-size: 13px; font-weight: 800; color: #9a3412; margin-bottom: 8px;">
+                            <div style="background-color: #fff7ed; border: 1.5px solid #fed7aa; border-radius: 14px; padding: 18px 20px; margin-bottom: 26px;">
+                                <div style="font-size: 18px; font-weight: 900; color: #9a3412; margin-bottom: 12px;">
                                     🔥 烤箱上下火設定 (${currentRecipeData.rackPos})
                                 </div>
-                                <div style="display: flex; justify-content: space-between; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #ffedd5; text-align: center;">
+                                <div style="display: flex; justify-content: space-between; background: #fff; padding: 14px 16px; border-radius: 10px; border: 1.5px solid #ffedd5; text-align: center;">
                                     <div style="flex: 1;">
-                                        <div style="font-size: 11px; color: #6b7280;">上火</div>
-                                        <div style="font-size: 17px; font-weight: 900; color: #b91c1c;">${currentRecipeData.topTemp || '—'}°C</div>
+                                        <div style="font-size: 15px; font-weight: 700; color: #6b7280; margin-bottom: 4px;">上火</div>
+                                        <div style="font-size: 26px; font-weight: 900; color: #b91c1c;">${currentRecipeData.topTemp || '—'}°C</div>
                                     </div>
-                                    <div style="width: 1px; background: #fed7aa;"></div>
+                                    <div style="width: 1.5px; background: #fed7aa;"></div>
                                     <div style="flex: 1;">
-                                        <div style="font-size: 11px; color: #6b7280;">下火</div>
-                                        <div style="font-size: 17px; font-weight: 900; color: #92400e;">${currentRecipeData.isSingleTempMode ? (currentRecipeData.topTemp || '—') : (currentRecipeData.bottomTemp || '—')}°C</div>
+                                        <div style="font-size: 15px; font-weight: 700; color: #6b7280; margin-bottom: 4px;">下火</div>
+                                        <div style="font-size: 26px; font-weight: 900; color: #92400e;">${currentRecipeData.isSingleTempMode ? (currentRecipeData.topTemp || '—') : (currentRecipeData.bottomTemp || '—')}°C</div>
                                     </div>
-                                    <div style="width: 1px; background: #fed7aa;"></div>
+                                    <div style="width: 1.5px; background: #fed7aa;"></div>
                                     <div style="flex: 1;">
-                                        <div style="font-size: 11px; color: #6b7280;">烘烤時間</div>
-                                        <div style="font-size: 17px; font-weight: 900; color: #1f2937;">${currentRecipeData.bakeTime || '—'} 分鐘</div>
+                                        <div style="font-size: 15px; font-weight: 700; color: #6b7280; margin-bottom: 4px;">烘烤時間</div>
+                                        <div style="font-size: 26px; font-weight: 900; color: #1f2937;">${currentRecipeData.bakeTime || '—'} 分鐘</div>
                                     </div>
                                 </div>
-                                ${currentRecipeData.bakeNotes ? `<div style="margin-top: 6px; font-size: 12px; color: #7c2d12;">備註：${currentRecipeData.bakeNotes}</div>` : ''}
+                                ${currentRecipeData.bakeNotes ? `<div style="margin-top: 10px; font-size: 16px; font-weight: 600; color: #7c2d12;">備註：${currentRecipeData.bakeNotes}</div>` : ''}
                             </div>
 
-                            <div style="margin-bottom: 25px;">
-                                <div style="font-size: 16px; font-weight: 900; color: #1f2937; margin-bottom: 10px; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px;">
+                            <div style="margin-bottom: 24px;">
+                                <div style="font-size: 22px; font-weight: 900; color: #1f2937; margin-bottom: 12px; border-bottom: 2.5px solid #e5e7eb; padding-bottom: 10px;">
                                     📋 主麵團實際投料
                                 </div>
                                 <div>${itemsHtml}</div>
                                 ${divideHtml}
                             </div>
 
-                            <div style="margin-top: 25px;">
-                                <div style="font-size: 12px; font-weight: 700; color: #6b7280; margin-bottom: 8px;">材料比例設定：</div>
+                            <div style="margin-top: 24px;">
+                                <div style="font-size: 16px; font-weight: 800; color: #4b5563; margin-bottom: 8px;">材料比例設定：</div>
                                 <div>${percentageHtml}</div>
                             </div>
 
-                            <div style="margin-top: 35px; text-align: center; font-size: 10px; color: #9ca3af;">
+                            <div style="margin-top: 32px; text-align: center; font-size: 13px; color: #9ca3af; font-weight: 500;">
                                 匯出時間: ${new Date().toLocaleDateString('zh-TW')} | 烘焙百分比計算器
                             </div>
                         </div>
