@@ -57,6 +57,7 @@ class RootErrorBoundary extends React.Component<
 
 const rootElement = document.getElementById('root');
 if (rootElement) {
+  (window as unknown as Record<string, boolean>).__APP_MOUNTED__ = true;
   createRoot(rootElement).render(
     <RootErrorBoundary>
       <App />

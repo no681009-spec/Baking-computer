@@ -15,30 +15,60 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
     <script>
-      // 防呆機制：若使用者直接將原始碼未經編譯部署至靜態空間 (如 GitHub Pages)，自動載入單頁完整版避免空白畫面
-      window.addEventListener('load', function () {
-        setTimeout(function () {
-          var root = document.getElementById('root');
-          if (root && root.children.length === 0) {
-            fetch('./public/assets/aistudio/index_b872a86c.html')
+      window.__loadStandaloneApp = function () {
+        if (window.__APP_MOUNTED__ || window.__STANDALONE_LOADING__) return;
+        window.__STANDALONE_LOADING__ = true;
+        var v = '20261103_' + Date.now();
+
+        function injectBundle(basePath, onFail) {
+          var link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = basePath + '/app.css?v=' + v;
+          document.head.appendChild(link);
+
+          var script = document.createElement('script');
+          script.type = 'module';
+          script.src = basePath + '/app.js?v=' + v;
+          script.onerror = function () {
+            if (onFail) onFail();
+          };
+          document.body.appendChild(script);
+        }
+
+        // 優先載入編譯後的完整 React 應用程式套件 (支援 GitHub Pages 根目錄直接發佈)
+        injectBundle('./public/assets/standalone', function () {
+          injectBundle('./assets/standalone', function () {
+            // 最終備援：載入單頁完整版 HTML (強制停用快取)
+            fetch('./public/assets/aistudio/index_b872a86c.html?v=' + v, { cache: 'no-store' })
               .then(function (res) {
                 if (res.ok) return res.text();
-                return fetch('./assets/aistudio/index_b872a86c.html').then(function (r2) {
+                return fetch('./assets/aistudio/index_b872a86c.html?v=' + v, { cache: 'no-store' }).then(function (r2) {
                   return r2.ok ? r2.text() : null;
                 });
               })
               .then(function (html) {
-                if (html && root.children.length === 0) {
+                var root = document.getElementById('root');
+                if (html && root && root.children.length === 0) {
                   document.open();
                   document.write(html);
                   document.close();
                 }
               })
               .catch(function () {});
+          });
+        });
+      };
+    </script>
+    <script type="module" src="/src/main.tsx" onerror="window.__loadStandaloneApp && window.__loadStandaloneApp()"></script>
+    <script>
+      window.addEventListener('load', function () {
+        setTimeout(function () {
+          var root = document.getElementById('root');
+          if (!window.__APP_MOUNTED__ && root && root.children.length === 0) {
+            window.__loadStandaloneApp();
           }
-        }, 600);
+        }, 400);
       });
     </script>
   </body>

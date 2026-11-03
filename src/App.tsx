@@ -319,9 +319,9 @@ export default function App() {
     const totalProvidedWaterPercent = liquidProvidedWaterPercent + prefWaterPercent;
 
     // 水量超標判斷：
-    // 若有設定目標水合率，且材料提供之水份百分比已超過目標水合率 (+0.05% 公差)
-    const waterExcessPercent = hasTargetHydration ? totalProvidedWaterPercent - hydration : 0;
-    const isWaterExceededByPercent = hasTargetHydration && waterExcessPercent > 0.05;
+    // 只要材料與酵種提供的總水份百分比 > 0，且超過目標水合率 (+0.05% 公差)，即觸發警告
+    const waterExcessPercent = totalProvidedWaterPercent - hydration;
+    const isWaterExceededByPercent = totalProvidedWaterPercent > 0.05 && waterExcessPercent > 0.05;
 
     // 麵粉超標判斷：湯種 + 酵種提撥麵粉超過 100%
     const flourWarning = tzPct + sdPct > 100.05;
@@ -927,6 +927,25 @@ export default function App() {
             </button>
           </div>
         </div>
+
+        {/* 置頂懸浮超標警告列：無論捲動到哪裡都會即時顯示 */}
+        {calc.waterWarning && (
+          <div className="max-w-7xl mx-auto mt-2.5 bg-red-600 text-white px-4 py-2.5 rounded-xl shadow-md flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
+            <div className="flex items-center gap-2 font-black">
+              <AlertTriangle className="w-5 h-5 shrink-0 text-yellow-200" />
+              <span>
+                ⚠️ 警告：材料總水量（{Number(calc.totalProvidedWaterPercent.toFixed(1))}%）已超過目標總水份（{calc.targetHydrationNum}%）達 +{Number(calc.waterExcessPercent.toFixed(1))}%
+                {calc.hasDoughWeight && calc.excessWaterGrams > 0
+                  ? `（約超標 ${Number(calc.excessWaterGrams.toFixed(1))} 克）`
+                  : ''}
+                ！
+              </span>
+            </div>
+            <span className="text-red-100 font-bold text-xs">
+              請調高步驟 2「目標總水份」或減少液體材料比例
+            </span>
+          </div>
+        )}
       </header>
 
       {/* Main Content */}
@@ -1736,6 +1755,44 @@ export default function App() {
                   </div>
                 ))}
               </div>
+
+              {/* 液體區塊底部即時水量總計與超標提示 */}
+              {calc.totalProvidedWaterPercent > 0 && (
+                <div
+                  className={`mt-4 p-3 rounded-xl border flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm ${
+                    calc.waterWarning
+                      ? 'bg-red-100 border-2 border-red-400 text-red-900 font-bold'
+                      : 'bg-white/90 border-blue-200 text-blue-900 font-medium'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    {calc.waterWarning ? (
+                      <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                    ) : (
+                      <span className="inline-block w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                    )}
+                    <span>
+                      目前材料折算總水份：
+                      <strong className="font-black underline mx-1">
+                        {Number(calc.totalProvidedWaterPercent.toFixed(1))}%
+                      </strong>
+                      （液體 {Number(calc.liquidProvidedWaterPercent.toFixed(1))}% + 酵種{' '}
+                      {Number(calc.prefWaterPercent.toFixed(1))}%）
+                    </span>
+                  </div>
+                  <div className="tabular-nums font-black">
+                    {calc.waterWarning ? (
+                      <span className="text-red-700">
+                        ⚠️ 已超過目標水份（{calc.targetHydrationNum}%）達 +{Number(calc.waterExcessPercent.toFixed(1))}%！
+                      </span>
+                    ) : (
+                      <span className="text-blue-800">
+                        目標總水份：{calc.targetHydrationNum}%（尚需純水 {Number(calc.remainingWaterPercent.toFixed(1))}%）
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </section>
 
             {/* 5. 粉狀與乾性材料清單 - 預設無預設數字，保持空白 */}

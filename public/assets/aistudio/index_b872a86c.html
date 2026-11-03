@@ -36,6 +36,7 @@
 <body class="min-h-screen p-4 sm:p-8 text-gray-800 relative">
 
     <div id="toastContainer" class="fixed top-4 left-0 right-0 z-50 flex flex-col items-center gap-2 pointer-events-none"></div>
+    <div id="stickyTopWaterWarning" class="hidden sticky top-2 z-40 max-w-5xl mx-auto mb-4 bg-red-600 text-white px-4 py-3 rounded-xl shadow-lg font-bold text-sm"></div>
 
     <div class="max-w-5xl mx-auto glass-panel rounded-2xl p-6 sm:p-10 shadow-xl">
         
@@ -232,6 +233,7 @@
                     </div>
                     <div id="waterWarningSection4" class="hidden mb-4 bg-red-100 border-2 border-red-400 text-red-950 p-3.5 rounded-xl text-xs sm:text-sm"></div>
                     <div id="liquidsContainer" class="space-y-3 mt-3"></div>
+                    <div id="waterBottomSection4" class="hidden mt-4 p-3 rounded-xl border text-xs sm:text-sm"></div>
                 </div>
 
                 <!-- 粉狀與乾性材料列表區 - 預設留白 -->
@@ -345,8 +347,10 @@
             exportLocalBtn: document.getElementById('exportLocalBtn'),
             importLocalInput: document.getElementById('importLocalInput'),
             toastContainer: document.getElementById('toastContainer'),
+            stickyTopWaterWarning: document.getElementById('stickyTopWaterWarning'),
             waterWarningSection2: document.getElementById('waterWarningSection2'),
             waterWarningSection4: document.getElementById('waterWarningSection4'),
+            waterBottomSection4: document.getElementById('waterBottomSection4'),
             waterWarningSummary: document.getElementById('waterWarningSummary')
         };
 
@@ -523,8 +527,8 @@
             let prefWaterPercent = tzWaterPercent + sdWaterPercent;
             let totalProvidedWaterPercent = liquidProvidedWaterPercent + prefWaterPercent;
 
-            let waterExcessPercent = hasTargetHydration ? totalProvidedWaterPercent - targetHydration : 0;
-            let isWaterExceeded = hasTargetHydration && waterExcessPercent > 0.05;
+            let waterExcessPercent = totalProvidedWaterPercent - targetHydration;
+            let isWaterExceeded = totalProvidedWaterPercent > 0.05 && waterExcessPercent > 0.05;
 
             // 即時更新警示通知
             if (isWaterExceeded) {
@@ -535,11 +539,15 @@
                             <div class="font-black text-red-800 text-sm">材料總水量已超過「目標總水份」！</div>
                             <div class="mt-1 font-medium leading-relaxed">
                                 材料與酵種已提供水份 <strong>${totalProvidedWaterPercent.toFixed(1)}%</strong>，已超過目標水合率（${targetHydration}%）達 <strong class="text-red-900">+${waterExcessPercent.toFixed(1)}%</strong>。
-                                請調高目標總水份或減少液體材料比例！
+                                請調高步驟 2「目標總水份」或減少液體材料比例！
                             </div>
                         </div>
                     </div>
                 `;
+                if (els.stickyTopWaterWarning) {
+                    els.stickyTopWaterWarning.innerHTML = `⚠️ 警告：材料總水量（${totalProvidedWaterPercent.toFixed(1)}%）已超過目標總水份（${targetHydration}%）達 +${waterExcessPercent.toFixed(1)}%！請調高目標水合率或減少液體材料比例。`;
+                    els.stickyTopWaterWarning.className = 'sticky top-2 z-40 max-w-5xl mx-auto mb-4 bg-red-600 text-white px-4 py-3 rounded-xl shadow-lg font-bold text-sm flex items-center justify-between';
+                }
                 if (els.waterWarningSection2) {
                     els.waterWarningSection2.innerHTML = bannerContent;
                     els.waterWarningSection2.className = 'mt-2.5 p-3.5 bg-red-100 border-2 border-red-400 rounded-xl text-red-950 text-xs sm:text-sm';
@@ -548,11 +556,16 @@
                     els.waterWarningSection4.innerHTML = bannerContent;
                     els.waterWarningSection4.className = 'mb-4 bg-red-100 border-2 border-red-400 text-red-950 p-3.5 rounded-xl text-xs sm:text-sm';
                 }
+                if (els.waterBottomSection4) {
+                    els.waterBottomSection4.innerHTML = `⚠️ 目前材料折算總水份：<strong>${totalProvidedWaterPercent.toFixed(1)}%</strong> / 目標總水份：<strong>${targetHydration}%</strong>（已超標 +${waterExcessPercent.toFixed(1)}%）`;
+                    els.waterBottomSection4.className = 'mt-4 p-3 rounded-xl bg-red-100 border-2 border-red-400 text-red-900 font-bold text-xs sm:text-sm';
+                }
                 if (els.waterWarningSummary) {
                     els.waterWarningSummary.innerHTML = bannerContent;
                     els.waterWarningSummary.className = 'mb-4 bg-red-50 border-2 border-red-400 p-3.5 rounded-xl text-xs text-red-950';
                 }
             } else {
+                if (els.stickyTopWaterWarning) els.stickyTopWaterWarning.className = 'hidden';
                 if (els.waterWarningSection2) {
                     if (hasTargetHydration && totalProvidedWaterPercent > 0) {
                         const remaining = Math.max(0, targetHydration - totalProvidedWaterPercent);
@@ -568,6 +581,15 @@
                     }
                 }
                 if (els.waterWarningSection4) els.waterWarningSection4.className = 'hidden';
+                if (els.waterBottomSection4) {
+                    if (totalProvidedWaterPercent > 0) {
+                        const remaining = Math.max(0, targetHydration - totalProvidedWaterPercent);
+                        els.waterBottomSection4.innerHTML = `💧 目前材料折算總水份：<strong>${totalProvidedWaterPercent.toFixed(1)}%</strong> / 目標總水份：<strong>${targetHydration}%</strong>（尚需純水 ${remaining.toFixed(1)}%）`;
+                        els.waterBottomSection4.className = 'mt-4 p-3 rounded-xl bg-white/90 border border-blue-200 text-blue-900 font-medium text-xs sm:text-sm';
+                    } else {
+                        els.waterBottomSection4.className = 'hidden';
+                    }
+                }
                 if (els.waterWarningSummary) els.waterWarningSummary.className = 'hidden';
             }
 
@@ -579,7 +601,9 @@
                 els.tzWaterDisplay.textContent = '—';
                 els.sdFlourDisplay.textContent = '—';
                 els.sdWaterDisplay.textContent = '—';
-                els.actualRecipeList.innerHTML = `<li class="text-center py-6 text-gray-400 text-sm">請輸入目標麵團總重量與水合率</li>`;
+                els.actualRecipeList.innerHTML = isWaterExceeded
+                    ? `<li class="text-center py-4 text-red-700 font-bold text-sm">⚠️ 材料總水量（${totalProvidedWaterPercent.toFixed(1)}%）已超過目標水份（${targetHydration}%）！</li>`
+                    : `<li class="text-center py-6 text-gray-400 text-sm">請輸入目標麵團總重量與水合率</li>`;
                 els.liquidsContainer.querySelectorAll('.liquid-row').forEach(row => {
                     row.querySelector('.weight-display').textContent = '—';
                     row.querySelector('.water-display').textContent = '—';
