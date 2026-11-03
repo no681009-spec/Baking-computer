@@ -95,6 +95,7 @@
                                class="w-full text-2xl font-bold p-3 pl-4 pr-16 rounded-lg border-2 border-blue-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-blue-50 text-blue-900 placeholder:text-blue-300 placeholder:text-lg placeholder:font-normal">
                         <span class="absolute right-4 top-1/2 -translate-y-1/2 text-blue-500 font-medium text-lg">%</span>
                     </div>
+                    <div id="waterWarningSection2" class="hidden mt-2.5 p-3.5 bg-red-100/90 border-2 border-red-400 rounded-xl text-red-950 text-xs sm:text-sm"></div>
                     
                     <div class="space-y-3 mt-6 border-t border-amber-200 pt-5">
                         <h3 class="text-sm font-bold text-amber-800 flex items-center gap-1">
@@ -229,6 +230,7 @@
                             新增液體
                         </button>
                     </div>
+                    <div id="waterWarningSection4" class="hidden mb-4 bg-red-100 border-2 border-red-400 text-red-950 p-3.5 rounded-xl text-xs sm:text-sm"></div>
                     <div id="liquidsContainer" class="space-y-3 mt-3"></div>
                 </div>
 
@@ -260,6 +262,7 @@
                             <span id="summaryOvenTemp" class="font-bold text-orange-800 text-sm">未設定烤溫</span>
                         </div>
                     </div>
+                    <div id="waterWarningSummary" class="hidden mb-4 bg-red-50 border-2 border-red-400 p-3.5 rounded-xl text-xs text-red-950"></div>
 
                     <div class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm flex-1">
                         <ul id="actualRecipeList" class="space-y-2.5 text-base">
@@ -341,7 +344,10 @@
             recipeCardContainer: document.getElementById('recipeCardContainer'),
             exportLocalBtn: document.getElementById('exportLocalBtn'),
             importLocalInput: document.getElementById('importLocalInput'),
-            toastContainer: document.getElementById('toastContainer')
+            toastContainer: document.getElementById('toastContainer'),
+            waterWarningSection2: document.getElementById('waterWarningSection2'),
+            waterWarningSection4: document.getElementById('waterWarningSection4'),
+            waterWarningSummary: document.getElementById('waterWarningSummary')
         };
 
         let isSingleTempMode = false;
@@ -490,7 +496,80 @@
             els.summaryOvenTemp.textContent = ovenText;
 
             let targetDoughWeight = parseFloat(els.targetDoughWeight.value) || 0;
+            let hasTargetHydration = els.targetHydration.value.trim() !== '';
             let targetHydration = parseFloat(els.targetHydration.value) || 0;
+
+            let dryPercentage = 0;
+            ingredients.forEach(ing => dryPercentage += (parseFloat(ing.percentage) || 0));
+
+            let liquidProvidedWaterPercent = 0;
+            let liquidSolidPercentage = 0;
+            liquidIngredients.forEach(liq => {
+                const lp = parseFloat(liq.percentage) || 0;
+                if (lp > 0) {
+                    const wc = liq.waterContent === '' ? 100 : (parseFloat(liq.waterContent) || 0);
+                    const waterPart = lp * (wc / 100);
+                    liquidProvidedWaterPercent += waterPart;
+                    liquidSolidPercentage += (lp - waterPart);
+                }
+            });
+
+            let tzPercent = parseFloat(els.tzPercent.value) || 0;
+            let tzRatio = parseInt(els.tzRatio.value) || 5;
+            let sdPercent = parseFloat(els.sdPercent.value) || 0;
+
+            let tzWaterPercent = tzPercent * tzRatio;
+            let sdWaterPercent = sdPercent * 1;
+            let prefWaterPercent = tzWaterPercent + sdWaterPercent;
+            let totalProvidedWaterPercent = liquidProvidedWaterPercent + prefWaterPercent;
+
+            let waterExcessPercent = hasTargetHydration ? totalProvidedWaterPercent - targetHydration : 0;
+            let isWaterExceeded = hasTargetHydration && waterExcessPercent > 0.05;
+
+            // 即時更新警示通知
+            if (isWaterExceeded) {
+                const bannerContent = `
+                    <div class="flex items-start gap-2.5">
+                        <span class="text-lg">⚠️</span>
+                        <div>
+                            <div class="font-black text-red-800 text-sm">材料總水量已超過「目標總水份」！</div>
+                            <div class="mt-1 font-medium leading-relaxed">
+                                材料與酵種已提供水份 <strong>${totalProvidedWaterPercent.toFixed(1)}%</strong>，已超過目標水合率（${targetHydration}%）達 <strong class="text-red-900">+${waterExcessPercent.toFixed(1)}%</strong>。
+                                請調高目標總水份或減少液體材料比例！
+                            </div>
+                        </div>
+                    </div>
+                `;
+                if (els.waterWarningSection2) {
+                    els.waterWarningSection2.innerHTML = bannerContent;
+                    els.waterWarningSection2.className = 'mt-2.5 p-3.5 bg-red-100 border-2 border-red-400 rounded-xl text-red-950 text-xs sm:text-sm';
+                }
+                if (els.waterWarningSection4) {
+                    els.waterWarningSection4.innerHTML = bannerContent;
+                    els.waterWarningSection4.className = 'mb-4 bg-red-100 border-2 border-red-400 text-red-950 p-3.5 rounded-xl text-xs sm:text-sm';
+                }
+                if (els.waterWarningSummary) {
+                    els.waterWarningSummary.innerHTML = bannerContent;
+                    els.waterWarningSummary.className = 'mb-4 bg-red-50 border-2 border-red-400 p-3.5 rounded-xl text-xs text-red-950';
+                }
+            } else {
+                if (els.waterWarningSection2) {
+                    if (hasTargetHydration && totalProvidedWaterPercent > 0) {
+                        const remaining = Math.max(0, targetHydration - totalProvidedWaterPercent);
+                        els.waterWarningSection2.innerHTML = `
+                            <div class="flex items-center justify-between text-blue-900 text-xs font-medium">
+                                <span>💧 材料已提供水份：<strong>${totalProvidedWaterPercent.toFixed(1)}%</strong> / 目標：<strong>${targetHydration}%</strong></span>
+                                <span class="font-bold">主麵團尚需純加水：${remaining.toFixed(1)}%</span>
+                            </div>
+                        `;
+                        els.waterWarningSection2.className = 'mt-2.5 p-2.5 bg-blue-100/70 border border-blue-200 rounded-lg text-blue-900 text-xs';
+                    } else {
+                        els.waterWarningSection2.className = 'hidden';
+                    }
+                }
+                if (els.waterWarningSection4) els.waterWarningSection4.className = 'hidden';
+                if (els.waterWarningSummary) els.waterWarningSummary.className = 'hidden';
+            }
 
             if (targetDoughWeight <= 0) {
                 els.summaryTotalFlour.textContent = '—';
@@ -508,26 +587,13 @@
                 els.ingredientsContainer.querySelectorAll('.ingredient-row').forEach(row => {
                     row.querySelector('.weight-display').textContent = '—';
                 });
+                currentRecipeData.warning = isWaterExceeded;
                 return;
             }
-
-            let dryPercentage = 0;
-            ingredients.forEach(ing => dryPercentage += (parseFloat(ing.percentage) || 0));
-
-            let liquidSolidPercentage = 0;
-            liquidIngredients.forEach(liq => {
-                const lp = parseFloat(liq.percentage) || 0;
-                const wc = liq.waterContent === '' ? 100 : (parseFloat(liq.waterContent) || 0);
-                liquidSolidPercentage += lp * (1 - (wc / 100));
-            });
 
             let totalPercentage = 100 + targetHydration + dryPercentage + liquidSolidPercentage;
             let totalFlourWeight = targetDoughWeight / (totalPercentage / 100);
             let totalWaterWeight = (totalFlourWeight * targetHydration) / 100;
-
-            let tzPercent = parseFloat(els.tzPercent.value) || 0;
-            let tzRatio = parseInt(els.tzRatio.value) || 5;
-            let sdPercent = parseFloat(els.sdPercent.value) || 0;
 
             let tzFlourWeight = (totalFlourWeight * tzPercent) / 100;
             let tzWaterWeight = tzFlourWeight * tzRatio;
@@ -574,8 +640,10 @@
             if (mainDoughFlourWeight > 0) {
                 mainRecipeItems.unshift({ name: '主麵團高筋麵粉', weight: mainDoughFlourWeight, color: 'text-amber-900', isMain: true });
             }
-            if (mainDoughWaterWeight > 0) {
+            if (mainDoughWaterWeight > 0.05) {
                 mainRecipeItems.splice(1, 0, { name: '主麵團純加水量', weight: mainDoughWaterWeight, color: 'text-blue-600', isMain: true });
+            } else if (isWaterExceeded || mainDoughWaterWeight < -0.05) {
+                mainRecipeItems.splice(1, 0, { name: '⚠️ 主麵團純加水 (已超標倒扣至 0g)', weight: 0, color: 'text-red-600', isMain: true });
             }
             if (tzTotalWeight > 0) mainRecipeItems.push({ name: '湯種 (預先製作)', weight: tzTotalWeight, color: 'text-orange-700', isPref: true });
             if (sdTotalWeight > 0) mainRecipeItems.push({ name: '自製酵母 (預先餵養)', weight: sdTotalWeight, color: 'text-orange-700', isPref: true });
@@ -633,7 +701,7 @@
                 isSingleTempMode: isSingleTempMode,
                 items: mainRecipeItems,
                 percentages: ingredientExportData,
-                warning: mainDoughWaterWeight < -0.05
+                warning: isWaterExceeded || (targetDoughWeight > 0 && mainDoughWaterWeight < -0.05)
             };
         }
 

@@ -283,24 +283,52 @@ export default function App() {
   // 精準烘焙百分比計算
   const calc = useMemo(() => {
     const doughW = Math.max(0, parseNum(targetDoughWeight));
+    const hasDoughWeight = parseNum(targetDoughWeight) > 0;
+    const hasTargetHydration = String(targetHydration).trim() !== '';
     const hydration = Math.max(0, parseNum(targetHydration));
 
     const dryPercentage = ingredients.reduce((sum, ing) => sum + parseNum(ing.percentage), 0);
-    const liquidSolidPercentage = liquidIngredients.reduce((sum, liq) => {
-      const pct = parseNum(liq.percentage);
-      // 若有填寫含水量則使用，若留白且有填寫比例則預設 100% 水份
-      const rawWc = liq.waterContent === '' ? 100 : parseNum(liq.waterContent);
-      const wc = Math.min(100, Math.max(0, rawWc));
-      return sum + pct * (1 - wc / 100);
-    }, 0);
 
-    const totalPercentage = 100 + hydration + dryPercentage + liquidSolidPercentage;
-    const totalFlourWeight = (totalPercentage > 0 && doughW > 0) ? doughW / (totalPercentage / 100) : 0;
-    const totalWaterWeight = totalFlourWeight > 0 ? (totalFlourWeight * hydration) / 100 : 0;
+    // 計算液體材料提供之水份百分比與固形物百分比 (相對於總麵粉 100%)
+    let liquidProvidedWaterPercent = 0;
+    let liquidSolidPercentage = 0;
+
+    liquidIngredients.forEach(liq => {
+      const pct = parseNum(liq.percentage);
+      if (pct > 0) {
+        // 若有填寫含水量則使用，若留白且有填寫比例則預設 100% 水份
+        const rawWc = liq.waterContent === '' ? 100 : parseNum(liq.waterContent);
+        const wc = Math.min(100, Math.max(0, rawWc));
+        const waterPart = (pct * wc) / 100;
+        const solidPart = pct - waterPart;
+        liquidProvidedWaterPercent += waterPart;
+        liquidSolidPercentage += solidPart;
+      }
+    });
 
     const tzPct = Math.max(0, parseNum(tzPercent));
     const tzRat = tzRatio || 5;
     const sdPct = Math.max(0, parseNum(sdPercent));
+
+    // 酵種水份百分比 (相對於總麵粉 100%)
+    const tzWaterPercent = tzPct * tzRat;
+    const sdWaterPercent = sdPct * 1;
+    const prefWaterPercent = tzWaterPercent + sdWaterPercent;
+
+    // 所有材料與酵種合計提供之總水份百分比 (基準為 100% 總麵粉)
+    const totalProvidedWaterPercent = liquidProvidedWaterPercent + prefWaterPercent;
+
+    // 水量超標判斷：
+    // 若有設定目標水合率，且材料提供之水份百分比已超過目標水合率 (+0.05% 公差)
+    const waterExcessPercent = hasTargetHydration ? totalProvidedWaterPercent - hydration : 0;
+    const isWaterExceededByPercent = hasTargetHydration && waterExcessPercent > 0.05;
+
+    // 麵粉超標判斷：湯種 + 酵種提撥麵粉超過 100%
+    const flourWarning = tzPct + sdPct > 100.05;
+
+    const totalPercentage = 100 + hydration + dryPercentage + liquidSolidPercentage;
+    const totalFlourWeight = totalPercentage > 0 && doughW > 0 ? doughW / (totalPercentage / 100) : 0;
+    const totalWaterWeight = totalFlourWeight > 0 ? (totalFlourWeight * hydration) / 100 : 0;
 
     const tzFlourWeight = totalFlourWeight > 0 ? (totalFlourWeight * tzPct) / 100 : 0;
     const tzWaterWeight = tzFlourWeight * tzRat;
@@ -317,6 +345,7 @@ export default function App() {
       const pct = parseNum(liq.percentage);
       const rawWc = liq.waterContent === '' ? 100 : parseNum(liq.waterContent);
       const wc = Math.min(100, Math.max(0, rawWc));
+      const waterPct = (pct * wc) / 100;
       const weight = totalFlourWeight > 0 ? (totalFlourWeight * pct) / 100 : 0;
       const waterWeight = weight * (wc / 100);
       const solidWeight = weight - waterWeight;
@@ -327,7 +356,8 @@ export default function App() {
       return {
         ...liq,
         weight,
-        waterWeight
+        waterWeight,
+        waterPercent: waterPct
       };
     });
 
@@ -347,6 +377,18 @@ export default function App() {
     const prefWaterRemaining = tzWaterWeight + sdWaterWeight;
     const mainDoughWaterWeight = totalFlourWeight > 0 ? totalWaterWeight - prefWaterRemaining - liquidProvidedWater : 0;
 
+    const waterWarning = isWaterExceededByPercent || (hasDoughWeight && mainDoughWaterWeight < -0.05);
+
+    const excessWaterGrams =
+      totalFlourWeight > 0 && waterExcessPercent > 0.05
+        ? (waterExcessPercent * totalFlourWeight) / 100
+        : totalFlourWeight > 0 && mainDoughWaterWeight < -0.05
+          ? Math.abs(mainDoughWaterWeight)
+          : 0;
+
+    const remainingWaterPercent = Math.max(0, hydration - totalProvidedWaterPercent);
+    const remainingWaterGrams = Math.max(0, mainDoughWaterWeight);
+
     const mainRecipeItems: Array<{
       name: string;
       weight: number;
@@ -365,7 +407,7 @@ export default function App() {
           hexColor: '#78350f',
           isMain: true
         });
-      } else if (mainDoughFlourWeight < 0) {
+      } else if (flourWarning || mainDoughFlourWeight < -0.05) {
         mainRecipeItems.push({
           name: '⚠️ 麵粉提撥超過 100%',
           weight: 0,
@@ -375,12 +417,20 @@ export default function App() {
         });
       }
 
-      if (mainDoughWaterWeight > 0) {
+      if (mainDoughWaterWeight > 0.05) {
         mainRecipeItems.push({
           name: '主麵團純加水量',
           weight: mainDoughWaterWeight,
           colorClass: 'text-blue-700',
           hexColor: '#1d4ed8',
+          isMain: true
+        });
+      } else if (waterWarning || mainDoughWaterWeight < -0.05) {
+        mainRecipeItems.push({
+          name: `⚠️ 主麵團純加水 (已超標 ${Number(excessWaterGrams.toFixed(1))}g 倒扣至 0g)`,
+          weight: 0,
+          colorClass: 'text-red-600',
+          hexColor: '#dc2626',
           isMain: true
         });
       }
@@ -442,10 +492,10 @@ export default function App() {
     const totalBakeMinutes =
       parseNum(oven.bakeTime) + (oven.enableStage2 ? parseNum(oven.stage2BakeTime) : 0);
 
-    const hasDoughWeight = parseNum(targetDoughWeight) > 0;
-
     return {
       hasDoughWeight,
+      hasTargetHydration,
+      targetHydrationNum: hydration,
       totalFlourWeight,
       totalWaterWeight,
       tzFlourWeight,
@@ -460,8 +510,15 @@ export default function App() {
       portions,
       perPortion,
       totalBakeMinutes,
-      waterWarning: hasDoughWeight && mainDoughWaterWeight < -0.05,
-      flourWarning: hasDoughWeight && mainDoughFlourWeight < -0.05
+      liquidProvidedWaterPercent,
+      prefWaterPercent,
+      totalProvidedWaterPercent,
+      waterExcessPercent,
+      excessWaterGrams,
+      remainingWaterPercent,
+      remainingWaterGrams,
+      waterWarning,
+      flourWarning: flourWarning || (hasDoughWeight && mainDoughFlourWeight < -0.05)
     };
   }, [
     targetDoughWeight,
@@ -515,7 +572,14 @@ export default function App() {
   // 儲存配方至配方簿
   const handleSaveToBook = () => {
     if (calc.waterWarning || calc.flourWarning) {
-      showToast('配方比例設定有誤，請修正後再儲存', 'error');
+      if (calc.waterWarning) {
+        showToast(
+          `材料總水量已超過目標總水份（超額 +${Number(calc.waterExcessPercent.toFixed(1))}%），請修正後再儲存`,
+          'error'
+        );
+      } else {
+        showToast('配方比例設定有誤，請修正後再儲存', 'error');
+      }
       return;
     }
 
@@ -595,7 +659,14 @@ export default function App() {
   // 下載 JSON 配方檔
   const handleExportJson = async () => {
     if (calc.waterWarning || calc.flourWarning) {
-      showToast('配方比例設定有誤，請修正後再匯出', 'error');
+      if (calc.waterWarning) {
+        showToast(
+          `材料總水量已超過目標總水份（超額 +${Number(calc.waterExcessPercent.toFixed(1))}%），請修正後再匯出`,
+          'error'
+        );
+      } else {
+        showToast('配方比例設定有誤，請修正後再匯出', 'error');
+      }
       return;
     }
 
@@ -719,7 +790,14 @@ export default function App() {
       return;
     }
     if (calc.waterWarning || calc.flourWarning) {
-      showToast('目前配方水量或麵粉比例有誤，請修正後再匯出圖片！', 'error');
+      if (calc.waterWarning) {
+        showToast(
+          `材料總水量已超過目標總水份（超額 +${Number(calc.waterExcessPercent.toFixed(1))}%），請修正後再匯出圖片！`,
+          'error'
+        );
+      } else {
+        showToast('目前配方麵粉比例有誤，請修正後再匯出圖片！', 'error');
+      }
       return;
     }
     if (!captureCardRef.current) return;
@@ -965,9 +1043,15 @@ export default function App() {
 
               <label
                 htmlFor="targetHydration"
-                className="block text-base font-bold text-blue-900 mb-2 border-t border-amber-200 pt-5"
+                className="block text-base font-bold text-blue-900 mb-2 border-t border-amber-200 pt-5 flex items-center justify-between"
               >
-                2. 請輸入「目標總水份 (水合率)」(%)
+                <span>2. 請輸入「目標總水份 (水合率)」(%)</span>
+                {calc.waterWarning && (
+                  <span className="text-xs bg-red-600 text-white font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    已超出目標水量！
+                  </span>
+                )}
               </label>
               <div className="relative mb-2">
                 <input
@@ -979,12 +1063,73 @@ export default function App() {
                   max={200}
                   step={1}
                   onChange={e => setTargetHydration(e.target.value)}
-                  className="w-full text-2xl font-bold p-3 pl-4 pr-16 rounded-lg border border-blue-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors bg-white text-blue-900 tabular-nums placeholder:text-blue-300 placeholder:text-lg placeholder:font-normal"
+                  className={`w-full text-2xl font-bold p-3 pl-4 pr-16 rounded-lg border outline-none transition-colors tabular-nums placeholder:text-lg placeholder:font-normal ${
+                    calc.waterWarning
+                      ? 'border-red-400 bg-red-50/50 text-red-900 focus:ring-2 focus:ring-red-500 focus:border-red-500 placeholder:text-red-300'
+                      : 'border-blue-300 bg-white text-blue-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-blue-300'
+                  }`}
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-600 font-bold text-lg">
+                <span
+                  className={`absolute right-4 top-1/2 -translate-y-1/2 font-black text-lg ${
+                    calc.waterWarning ? 'text-red-600' : 'text-blue-600'
+                  }`}
+                >
                   %
                 </span>
               </div>
+
+              {/* 水份即時檢核與警示通知 */}
+              {calc.waterWarning ? (
+                <div className="mt-2.5 p-3.5 bg-red-100/90 border-2 border-red-400 rounded-xl text-red-950 text-xs sm:text-sm flex items-start gap-2.5 shadow-sm">
+                  <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <div className="font-black text-red-800 text-sm sm:text-base flex items-center gap-1.5">
+                      <span>⚠️ 材料總水量已超過「目標總水份」！</span>
+                    </div>
+                    <div className="leading-relaxed font-medium">
+                      材料清單與酵種已提供水份{' '}
+                      <strong className="underline text-red-900 font-black">
+                        {Number(calc.totalProvidedWaterPercent.toFixed(1))}%
+                      </strong>
+                      ，超過目標水合率（{calc.targetHydrationNum}%）達{' '}
+                      <strong className="text-red-900 font-black">
+                        +{Number(calc.waterExcessPercent.toFixed(1))}%
+                      </strong>
+                      {calc.hasDoughWeight && calc.excessWaterGrams > 0 && (
+                        <span>
+                          {' '}
+                          (超額約{' '}
+                          <strong className="text-red-900 font-black">
+                            {Number(calc.excessWaterGrams.toFixed(1))} 克
+                          </strong>
+                          )
+                        </span>
+                      )}
+                      。
+                    </div>
+                    <div className="text-xs text-red-800 font-bold bg-white/60 p-2 rounded-lg border border-red-200">
+                      💡 建議：請將目標水合率提高至至少 {Number(calc.totalProvidedWaterPercent.toFixed(1))}%，或調降液體材料（如牛奶、水）與酵種比例。
+                    </div>
+                  </div>
+                </div>
+              ) : calc.hasTargetHydration && calc.totalProvidedWaterPercent > 0 ? (
+                <div className="mt-2 p-2.5 bg-blue-100/70 border border-blue-200 rounded-lg text-blue-900 text-xs flex flex-wrap items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5 font-medium">
+                    <span className="inline-block w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
+                    <span>
+                      材料已提供水份：<strong>{Number(calc.totalProvidedWaterPercent.toFixed(1))}%</strong> / 目標：<strong>{calc.targetHydrationNum}%</strong>
+                    </span>
+                  </div>
+                  <div className="font-bold text-blue-800 tabular-nums">
+                    主麵團尚需純加水：{Number(calc.remainingWaterPercent.toFixed(1))}%
+                    {calc.hasDoughWeight && calc.remainingWaterGrams > 0 && (
+                      <span className="font-normal text-blue-700 ml-1">
+                        ({Number(calc.remainingWaterGrams.toFixed(1))}g)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : null}
 
               {/* 進階：湯種/自製酵母 - 預設留白 */}
               <div className="space-y-3 mt-6 border-t border-amber-200 pt-5">
@@ -1440,13 +1585,27 @@ export default function App() {
             {/* 4. 液體材料清單 - 預設無預設數字，保持空白 */}
             <section
               id="liquids-section"
-              className="bg-blue-50/80 rounded-xl p-5 border border-blue-200"
+              className={`rounded-xl p-5 border transition-colors ${
+                calc.waterWarning ? 'bg-red-50/70 border-red-300' : 'bg-blue-50/80 border-blue-200'
+              }`}
             >
-              <div className="flex justify-between items-end mb-4 border-b border-blue-200 pb-3">
+              <div className="flex justify-between items-end mb-4 border-b pb-3 border-blue-200/80">
                 <div>
-                  <h2 className="text-xl font-bold text-blue-900">💧 液體材料清單</h2>
-                  <p className="text-xs text-blue-700 mt-1">
-                    含水量會自動從主麵團的「純加水量」中扣除
+                  <h2
+                    className={`text-xl font-bold flex items-center gap-2 ${
+                      calc.waterWarning ? 'text-red-900' : 'text-blue-900'
+                    }`}
+                  >
+                    <span>💧 液體材料清單</span>
+                    {calc.waterWarning && (
+                      <span className="text-xs bg-red-600 text-white font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        含水量已超標
+                      </span>
+                    )}
+                  </h2>
+                  <p className={`text-xs mt-1 ${calc.waterWarning ? 'text-red-700' : 'text-blue-700'}`}>
+                    含水量會自動從主麵團的「純加水量」中扣除；若總含水超過目標水合率將觸發警示
                   </p>
                 </div>
                 <button
@@ -1458,6 +1617,39 @@ export default function App() {
                   <span>新增液體</span>
                 </button>
               </div>
+
+              {/* 液體清單水量超標警示 */}
+              {calc.waterWarning && (
+                <div className="mb-4 bg-red-100 border-2 border-red-400 text-red-950 p-3.5 rounded-xl flex items-start gap-2.5 shadow-sm">
+                  <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                  <div className="text-xs sm:text-sm">
+                    <div className="font-black text-red-800 text-sm sm:text-base">
+                      ⚠️ 材料總水量已超過「目標總水份」！
+                    </div>
+                    <div className="mt-1 font-medium leading-relaxed">
+                      清單液體折水（{Number(calc.liquidProvidedWaterPercent.toFixed(1))}%）加上酵種含水（{Number(calc.prefWaterPercent.toFixed(1))}%），合計已提供{' '}
+                      <span className="font-black underline text-red-900">
+                        {Number(calc.totalProvidedWaterPercent.toFixed(1))}%
+                      </span>{' '}
+                      水份，超過目標水合率（{calc.targetHydrationNum}%）達{' '}
+                      <span className="font-black text-red-900">
+                        +{Number(calc.waterExcessPercent.toFixed(1))}%
+                      </span>
+                      {calc.hasDoughWeight && calc.excessWaterGrams > 0 && (
+                        <span>
+                          {' '}
+                          (超額約{' '}
+                          <span className="font-black text-red-900">
+                            {Number(calc.excessWaterGrams.toFixed(1))} 克
+                          </span>
+                          )
+                        </span>
+                      )}
+                      。請減少液體材料比例，或至步驟 2 調高「目標總水份」！
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-3 mt-3">
                 {calc.computedLiquids.map(liq => (
@@ -1520,7 +1712,11 @@ export default function App() {
                             <span className="text-sm text-gray-500 font-normal">g</span>
                           </div>
                           <div className="text-xs text-blue-600 font-medium mt-0.5">
-                            {liq.waterWeight > 0 ? `折水 ${Number(liq.waterWeight.toFixed(1))}g` : '折水 —'}
+                            {liq.waterWeight > 0
+                              ? `折水 ${Number(liq.waterWeight.toFixed(1))}g (${Number((liq.waterPercent ?? 0).toFixed(1))}%)`
+                              : parseNum(liq.percentage) > 0
+                                ? `折水 ${Number((liq.waterPercent ?? 0).toFixed(1))}%`
+                                : '折水 —'}
                           </div>
                         </div>
                         {liq.deletable ? (
@@ -1710,11 +1906,37 @@ export default function App() {
 
               {/* 警告訊息 */}
               {calc.waterWarning && (
-                <div className="mb-4 text-red-700 text-xs font-bold bg-red-50 p-3 rounded-lg border border-red-200 flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                  <span>
-                    液體材料與酵種含水量已超過「目標水合率」！請提高總水合率，或減少液體材料比例。
-                  </span>
+                <div className="mb-4 bg-red-50 border-2 border-red-400 p-3.5 rounded-xl flex items-start gap-2.5 shadow-sm">
+                  <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                  <div className="text-xs text-red-950 space-y-1">
+                    <div className="font-black text-sm text-red-800">
+                      ⚠️ 材料總水量已超過「目標總水份」！
+                    </div>
+                    <div className="leading-relaxed font-medium">
+                      材料清單與酵種已提供{' '}
+                      <span className="font-black underline text-red-900">
+                        {Number(calc.totalProvidedWaterPercent.toFixed(1))}%
+                      </span>{' '}
+                      水份，超過目標水合率（{calc.targetHydrationNum}%）達{' '}
+                      <span className="font-black text-red-900">
+                        +{Number(calc.waterExcessPercent.toFixed(1))}%
+                      </span>
+                      {calc.hasDoughWeight && calc.excessWaterGrams > 0 && (
+                        <span>
+                          {' '}
+                          (超額約{' '}
+                          <span className="font-black text-red-900">
+                            {Number(calc.excessWaterGrams.toFixed(1))} 克
+                          </span>
+                          )
+                        </span>
+                      )}
+                      。
+                    </div>
+                    <div className="text-[11px] text-red-800 font-bold bg-white/70 p-2 rounded-lg border border-red-200">
+                      主麵團純加水量已被扣除至 0g，麵團整體水份過多。請提高水合率或減少液體比例！
+                    </div>
+                  </div>
                 </div>
               )}
 
