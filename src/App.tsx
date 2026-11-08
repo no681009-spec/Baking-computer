@@ -609,7 +609,7 @@ export default function App() {
     setTargetDoughWeight(recipe.targetDoughWeight ?? '');
     setTargetHydration(recipe.targetHydration ?? '');
     setTzPercent(recipe.tzPercent ?? '');
-    setTzRatio(recipe.tzRatio ? Number(recipe.tzRatio) : 5);
+    setTzRatio(Number(recipe.tzRatio) === 1 ? 1 : 5);
     setSdPercent(recipe.sdPercent ?? '');
     setDivideCount(recipe.divideCount ?? '');
 
@@ -1182,8 +1182,8 @@ export default function App() {
                         onChange={e => setTzRatio(parseInt(e.target.value, 10) || 5)}
                         className="p-1.5 border border-gray-300 rounded text-xs text-gray-700 bg-white focus:ring-1 focus:ring-amber-500 outline-none font-medium"
                       >
-                        <option value={2}>粉水比 1:2</option>
                         <option value={5}>粉水比 1:5</option>
+                        <option value={1}>粉水比 1:1</option>
                       </select>
                     </div>
                   </div>

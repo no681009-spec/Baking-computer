@@ -19046,7 +19046,7 @@ function App() {
 		setTargetDoughWeight(recipe.targetDoughWeight ?? "");
 		setTargetHydration(recipe.targetHydration ?? "");
 		setTzPercent(recipe.tzPercent ?? "");
-		setTzRatio(recipe.tzRatio ? Number(recipe.tzRatio) : 5);
+		setTzRatio(Number(recipe.tzRatio) === 1 ? 1 : 5);
 		setSdPercent(recipe.sdPercent ?? "");
 		setDivideCount(recipe.divideCount ?? "");
 		if (recipe.oven) setOven({
@@ -19593,11 +19593,11 @@ function App() {
 																onChange: (e) => setTzRatio(parseInt(e.target.value, 10) || 5),
 																className: "p-1.5 border border-gray-300 rounded text-xs text-gray-700 bg-white focus:ring-1 focus:ring-amber-500 outline-none font-medium",
 																children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
-																	value: 2,
-																	children: "粉水比 1:2"
-																}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
 																	value: 5,
 																	children: "粉水比 1:5"
+																}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+																	value: 1,
+																	children: "粉水比 1:1"
 																})]
 															})
 														})]
