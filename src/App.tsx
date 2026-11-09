@@ -478,7 +478,24 @@ export default function App() {
       });
     }
 
+    const prefermentExportData: Array<{ name: string; percent: number | string; note: string }> = [];
+    if (tzPct > 0) {
+      prefermentExportData.push({
+        name: '湯種',
+        percent: tzPercent,
+        note: `(提撥麵粉・粉水比1:${tzRat})`
+      });
+    }
+    if (sdPct > 0) {
+      prefermentExportData.push({
+        name: '自製酵母',
+        percent: sdPercent,
+        note: '(提撥麵粉・粉水比1:1)'
+      });
+    }
+
     const ingredientExportData = [
+      ...prefermentExportData,
       ...computedLiquids
         .filter(l => parseNum(l.percentage) > 0)
         .map(l => ({ name: l.name, percent: l.percentage, note: l.waterContent !== '' ? `(含水${l.waterContent}%)` : '' })),

@@ -18929,15 +18929,30 @@ function App() {
 				});
 			});
 		}
-		const ingredientExportData = [...computedLiquids.filter((l) => parseNum(l.percentage) > 0).map((l) => ({
-			name: l.name,
-			percent: l.percentage,
-			note: l.waterContent !== "" ? `(含水${l.waterContent}%)` : ""
-		})), ...computedDry.filter((d) => parseNum(d.percentage) > 0).map((d) => ({
-			name: d.name,
-			percent: d.percentage,
-			note: ""
-		}))];
+		const prefermentExportData = [];
+		if (tzPct > 0) prefermentExportData.push({
+			name: "湯種",
+			percent: tzPercent,
+			note: `(提撥麵粉・粉水比1:${tzRat})`
+		});
+		if (sdPct > 0) prefermentExportData.push({
+			name: "自製酵母",
+			percent: sdPercent,
+			note: "(提撥麵粉・粉水比1:1)"
+		});
+		const ingredientExportData = [
+			...prefermentExportData,
+			...computedLiquids.filter((l) => parseNum(l.percentage) > 0).map((l) => ({
+				name: l.name,
+				percent: l.percentage,
+				note: l.waterContent !== "" ? `(含水${l.waterContent}%)` : ""
+			})),
+			...computedDry.filter((d) => parseNum(d.percentage) > 0).map((d) => ({
+				name: d.name,
+				percent: d.percentage,
+				note: ""
+			}))
+		];
 		const portions = Math.max(1, Math.floor(parseNum(divideCount) || 1));
 		const perPortion = totalWeight > 0 ? totalWeight / portions : 0;
 		const totalBakeMinutes = parseNum(oven.bakeTime) + (oven.enableStage2 ? parseNum(oven.stage2BakeTime) : 0);

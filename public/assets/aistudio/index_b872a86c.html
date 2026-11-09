@@ -669,8 +669,18 @@
             } else if (isWaterExceeded || mainDoughWaterWeight < -0.05) {
                 mainRecipeItems.splice(1, 0, { name: '⚠️ 主麵團純加水 (已超標倒扣至 0g)', weight: 0, color: 'text-red-600', isMain: true });
             }
-            if (tzTotalWeight > 0) mainRecipeItems.push({ name: '湯種 (預先製作)', weight: tzTotalWeight, color: 'text-orange-700', isPref: true });
-            if (sdTotalWeight > 0) mainRecipeItems.push({ name: '自製酵母 (預先餵養)', weight: sdTotalWeight, color: 'text-orange-700', isPref: true });
+            if (tzTotalWeight > 0) {
+                mainRecipeItems.push({ name: `湯種 (預先製作 粉${Number(tzFlourWeight.toFixed(1))}g + 水${Number(tzWaterWeight.toFixed(1))}g)`, weight: tzTotalWeight, color: 'text-orange-700', isPref: true });
+            }
+            if (sdTotalWeight > 0) {
+                mainRecipeItems.push({ name: `自製酵母 (預先餵養 粉${Number(sdFlourWeight.toFixed(1))}g + 水${Number(sdWaterWeight.toFixed(1))}g)`, weight: sdTotalWeight, color: 'text-orange-700', isPref: true });
+            }
+            if (tzPercent > 0) {
+                ingredientExportData.unshift({ name: '湯種', percent: tzPercent, note: `(提撥麵粉・粉水比1:${tzRatio})` });
+            }
+            if (sdPercent > 0) {
+                ingredientExportData.push({ name: '自製酵母', percent: sdPercent, note: '(提撥麵粉・粉水比1:1)' });
+            }
 
             els.ingredientsContainer.querySelectorAll('.ingredient-row').forEach(row => {
                 const id = row.dataset.id;
