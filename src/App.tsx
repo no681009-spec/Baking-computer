@@ -388,10 +388,12 @@ export default function App() {
 
     const remainingWaterPercent = Math.max(0, hydration - totalProvidedWaterPercent);
     const remainingWaterGrams = Math.max(0, mainDoughWaterWeight);
+    const mainDoughFlourPercent = Math.max(0, 100 - tzPct - sdPct);
 
     const mainRecipeItems: Array<{
       name: string;
       weight: number;
+      percentLabel?: string;
       colorClass: string;
       hexColor: string;
       isMain?: boolean;
@@ -401,8 +403,9 @@ export default function App() {
     if (totalFlourWeight > 0) {
       if (mainDoughFlourWeight > 0) {
         mainRecipeItems.push({
-          name: '主麵團高筋麵粉',
+          name: `主麵團高筋麵粉 (${Number(mainDoughFlourPercent.toFixed(1))}%)`,
           weight: mainDoughFlourWeight,
+          percentLabel: `${Number(mainDoughFlourPercent.toFixed(1))}%`,
           colorClass: 'text-amber-900',
           hexColor: '#78350f',
           isMain: true
@@ -419,8 +422,9 @@ export default function App() {
 
       if (mainDoughWaterWeight > 0.05) {
         mainRecipeItems.push({
-          name: '主麵團純加水量',
+          name: `主麵團純加水量 (${Number(remainingWaterPercent.toFixed(1))}%)`,
           weight: mainDoughWaterWeight,
+          percentLabel: `${Number(remainingWaterPercent.toFixed(1))}%`,
           colorClass: 'text-blue-700',
           hexColor: '#1d4ed8',
           isMain: true
@@ -438,8 +442,9 @@ export default function App() {
       computedLiquids.forEach(liq => {
         if (liq.weight > 0) {
           mainRecipeItems.push({
-            name: liq.name,
+            name: `${liq.name} (${liq.percentage}%)`,
             weight: liq.weight,
+            percentLabel: `${liq.percentage}%`,
             colorClass: 'text-blue-800',
             hexColor: '#1e40af'
           });
@@ -448,8 +453,9 @@ export default function App() {
 
       if (tzTotalWeight > 0) {
         mainRecipeItems.push({
-          name: `湯種 (預先製作 粉${Number(tzFlourWeight.toFixed(1))}g + 水${Number(tzWaterWeight.toFixed(1))}g)`,
+          name: `湯種 [提撥 ${tzPercent}% 麵粉・1:${tzRat}] (粉${Number(tzFlourWeight.toFixed(1))}g + 水${Number(tzWaterWeight.toFixed(1))}g)`,
           weight: tzTotalWeight,
+          percentLabel: `${tzPercent}%`,
           colorClass: 'text-orange-700',
           hexColor: '#c2410c',
           isPref: true
@@ -458,8 +464,9 @@ export default function App() {
 
       if (sdTotalWeight > 0) {
         mainRecipeItems.push({
-          name: `自製酵母 (預先餵養 粉${Number(sdFlourWeight.toFixed(1))}g + 水${Number(sdWaterWeight.toFixed(1))}g)`,
+          name: `自製酵母 [提撥 ${sdPercent}% 麵粉・1:1] (粉${Number(sdFlourWeight.toFixed(1))}g + 水${Number(sdWaterWeight.toFixed(1))}g)`,
           weight: sdTotalWeight,
+          percentLabel: `${sdPercent}%`,
           colorClass: 'text-orange-700',
           hexColor: '#c2410c',
           isPref: true
@@ -469,8 +476,9 @@ export default function App() {
       computedDry.forEach(ing => {
         if (ing.weight > 0) {
           mainRecipeItems.push({
-            name: ing.name,
+            name: `${ing.name} (${ing.percentage}%)`,
             weight: ing.weight,
+            percentLabel: `${ing.percentage}%`,
             colorClass: 'text-gray-800',
             hexColor: '#1f2937'
           });
@@ -478,31 +486,68 @@ export default function App() {
       });
     }
 
-    const prefermentExportData: Array<{ name: string; percent: number | string; note: string }> = [];
-    if (tzPct > 0) {
-      prefermentExportData.push({
-        name: '湯種',
-        percent: tzPercent,
-        note: `(提撥麵粉・粉水比1:${tzRat})`
-      });
-    }
-    if (sdPct > 0) {
-      prefermentExportData.push({
-        name: '自製酵母',
-        percent: sdPercent,
-        note: '(提撥麵粉・粉水比1:1)'
+    const allIngredientPercentages: Array<{
+      name: string;
+      percent: number | string;
+      note: string;
+      isPref?: boolean;
+    }> = [];
+
+    if (mainDoughFlourPercent > 0 && (totalFlourWeight > 0 || tzPct > 0 || sdPct > 0)) {
+      allIngredientPercentages.push({
+        name: '主麵團高筋麵粉',
+        percent: Number(mainDoughFlourPercent.toFixed(1)),
+        note: tzPct > 0 || sdPct > 0 ? '(扣除種麵後)' : '(總麵粉)'
       });
     }
 
-    const ingredientExportData = [
-      ...prefermentExportData,
-      ...computedLiquids
-        .filter(l => parseNum(l.percentage) > 0)
-        .map(l => ({ name: l.name, percent: l.percentage, note: l.waterContent !== '' ? `(含水${l.waterContent}%)` : '' })),
-      ...computedDry
-        .filter(d => parseNum(d.percentage) > 0)
-        .map(d => ({ name: d.name, percent: d.percentage, note: '' }))
-    ];
+    if (tzPct > 0) {
+      allIngredientPercentages.push({
+        name: '湯種',
+        percent: tzPercent,
+        note: `(提撥麵粉・1:${tzRat}・總重${Number((tzPct * (1 + tzRat)).toFixed(1))}%)`,
+        isPref: true
+      });
+    }
+
+    if (sdPct > 0) {
+      allIngredientPercentages.push({
+        name: '自製酵母',
+        percent: sdPercent,
+        note: `(提撥麵粉・1:1・總重${Number((sdPct * 2).toFixed(1))}%)`,
+        isPref: true
+      });
+    }
+
+    if (remainingWaterPercent > 0.05) {
+      allIngredientPercentages.push({
+        name: '主麵團純加水量',
+        percent: Number(remainingWaterPercent.toFixed(1)),
+        note: ''
+      });
+    }
+
+    computedLiquids
+      .filter(l => parseNum(l.percentage) > 0)
+      .forEach(l => {
+        allIngredientPercentages.push({
+          name: l.name,
+          percent: l.percentage,
+          note: l.waterContent !== '' ? `(含水${l.waterContent}%)` : ''
+        });
+      });
+
+    computedDry
+      .filter(d => parseNum(d.percentage) > 0)
+      .forEach(d => {
+        allIngredientPercentages.push({
+          name: d.name,
+          percent: d.percentage,
+          note: ''
+        });
+      });
+
+    const ingredientExportData = allIngredientPercentages;
 
     const portions = Math.max(1, Math.floor(parseNum(divideCount) || 1));
     const perPortion = totalWeight > 0 ? totalWeight / portions : 0;
@@ -515,6 +560,10 @@ export default function App() {
       targetHydrationNum: hydration,
       totalFlourWeight,
       totalWaterWeight,
+      tzPct,
+      tzRat,
+      sdPct,
+      mainDoughFlourPercent,
       tzFlourWeight,
       tzWaterWeight,
       sdFlourWeight,
@@ -2354,6 +2403,74 @@ export default function App() {
               )}
             </div>
 
+            {/* 湯種與自製酵母百分比專區 */}
+            {(calc.tzPct > 0 || calc.sdPct > 0) && (
+              <div
+                style={{
+                  backgroundColor: '#fef3c7',
+                  border: '1.5px solid #f59e0b',
+                  borderRadius: '14px',
+                  padding: '16px 20px',
+                  marginBottom: '22px'
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '18px',
+                    fontWeight: 900,
+                    color: '#92400e',
+                    marginBottom: '10px'
+                  }}
+                >
+                  🌾 湯種 / 自製酵母百分比設定
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {calc.tzPct > 0 && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        backgroundColor: '#ffffff',
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        border: '1px solid #fde68a'
+                      }}
+                    >
+                      <span style={{ fontSize: '18px', fontWeight: 800, color: '#78350f' }}>
+                        湯種 (粉水比 1:{calc.tzRat})
+                      </span>
+                      <span style={{ fontSize: '19px', fontWeight: 900, color: '#b45309' }}>
+                        提撥麵粉 {tzPercent}% (含水 {Number((calc.tzPct * calc.tzRat).toFixed(1))}% · 總重{' '}
+                        {Number((calc.tzFlourWeight + calc.tzWaterWeight).toFixed(1))}g)
+                      </span>
+                    </div>
+                  )}
+                  {calc.sdPct > 0 && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        backgroundColor: '#ffffff',
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        border: '1px solid #fde68a'
+                      }}
+                    >
+                      <span style={{ fontSize: '18px', fontWeight: 800, color: '#78350f' }}>
+                        自製酵母 (粉水比 1:1)
+                      </span>
+                      <span style={{ fontSize: '19px', fontWeight: 900, color: '#b45309' }}>
+                        提撥麵粉 {sdPercent}% (含水 {Number(calc.sdPct.toFixed(1))}% · 總重{' '}
+                        {Number((calc.sdFlourWeight + calc.sdWaterWeight).toFixed(1))}g)
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* 實際投料清單 */}
             <div style={{ marginBottom: '24px' }}>
               <div
@@ -2366,7 +2483,7 @@ export default function App() {
                   paddingBottom: '10px'
                 }}
               >
-                📋 主麵團實際投料
+                📋 主麵團實際投料 (含百分比標示)
               </div>
               <div>
                 {calc.mainRecipeItems.map((item, idx) => (
@@ -2382,7 +2499,7 @@ export default function App() {
                   >
                     <span
                       style={{
-                        fontSize: '21px',
+                        fontSize: '20px',
                         color: '#374151',
                         fontWeight: item.isMain || item.isPref ? 800 : 600
                       }}
@@ -2422,20 +2539,37 @@ export default function App() {
               <div style={{ marginTop: '22px' }}>
                 <div
                   style={{
-                    fontSize: '16px',
-                    fontWeight: 800,
-                    color: '#4b5563',
-                    marginBottom: '8px'
+                    fontSize: '17px',
+                    fontWeight: 900,
+                    color: '#374151',
+                    marginBottom: '10px'
                   }}
                 >
-                  材料烘焙百分比設定：
+                  📊 所有材料烘焙百分比設定 (含湯種・自製酵母)：
                 </div>
-                <div style={{ fontSize: '16px', color: '#374151', lineHeight: 1.8 }}>
+                <div style={{ lineHeight: 1.8 }}>
                   {calc.ingredientExportData.map((p, i) => (
-                    <span key={i}>
-                      {i > 0 && ' · '}
-                      {p.name} <strong>{p.percent}%</strong> {p.note}
-                    </span>
+                    <div
+                      key={i}
+                      style={{
+                        display: 'inline-block',
+                        backgroundColor: p.isPref ? '#fef3c7' : '#f3f4f6',
+                        border: p.isPref ? '1.5px solid #f59e0b' : '1px solid #e5e7eb',
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        fontSize: '16px',
+                        color: p.isPref ? '#92400e' : '#1f2937',
+                        margin: '5px 6px 0 0'
+                      }}
+                    >
+                      <span style={{ fontWeight: 700 }}>{p.name}:</span>{' '}
+                      <strong style={{ fontWeight: 900 }}>{p.percent}%</strong>{' '}
+                      {p.note && (
+                        <span style={{ fontSize: '14px', color: p.isPref ? '#b45309' : '#6b7280' }}>
+                          {p.note}
+                        </span>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>

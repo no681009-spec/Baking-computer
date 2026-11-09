@@ -18868,11 +18868,13 @@ function App() {
 		const excessWaterGrams = totalFlourWeight > 0 && waterExcessPercent > .05 ? waterExcessPercent * totalFlourWeight / 100 : totalFlourWeight > 0 && mainDoughWaterWeight < -.05 ? Math.abs(mainDoughWaterWeight) : 0;
 		const remainingWaterPercent = Math.max(0, hydration - totalProvidedWaterPercent);
 		const remainingWaterGrams = Math.max(0, mainDoughWaterWeight);
+		const mainDoughFlourPercent = Math.max(0, 100 - tzPct - sdPct);
 		const mainRecipeItems = [];
 		if (totalFlourWeight > 0) {
 			if (mainDoughFlourWeight > 0) mainRecipeItems.push({
-				name: "主麵團高筋麵粉",
+				name: `主麵團高筋麵粉 (${Number(mainDoughFlourPercent.toFixed(1))}%)`,
 				weight: mainDoughFlourWeight,
+				percentLabel: `${Number(mainDoughFlourPercent.toFixed(1))}%`,
 				colorClass: "text-amber-900",
 				hexColor: "#78350f",
 				isMain: true
@@ -18885,8 +18887,9 @@ function App() {
 				isMain: true
 			});
 			if (mainDoughWaterWeight > .05) mainRecipeItems.push({
-				name: "主麵團純加水量",
+				name: `主麵團純加水量 (${Number(remainingWaterPercent.toFixed(1))}%)`,
 				weight: mainDoughWaterWeight,
+				percentLabel: `${Number(remainingWaterPercent.toFixed(1))}%`,
 				colorClass: "text-blue-700",
 				hexColor: "#1d4ed8",
 				isMain: true
@@ -18900,59 +18903,77 @@ function App() {
 			});
 			computedLiquids.forEach((liq) => {
 				if (liq.weight > 0) mainRecipeItems.push({
-					name: liq.name,
+					name: `${liq.name} (${liq.percentage}%)`,
 					weight: liq.weight,
+					percentLabel: `${liq.percentage}%`,
 					colorClass: "text-blue-800",
 					hexColor: "#1e40af"
 				});
 			});
 			if (tzTotalWeight > 0) mainRecipeItems.push({
-				name: `湯種 (預先製作 粉${Number(tzFlourWeight.toFixed(1))}g + 水${Number(tzWaterWeight.toFixed(1))}g)`,
+				name: `湯種 [提撥 ${tzPercent}% 麵粉・1:${tzRat}] (粉${Number(tzFlourWeight.toFixed(1))}g + 水${Number(tzWaterWeight.toFixed(1))}g)`,
 				weight: tzTotalWeight,
+				percentLabel: `${tzPercent}%`,
 				colorClass: "text-orange-700",
 				hexColor: "#c2410c",
 				isPref: true
 			});
 			if (sdTotalWeight > 0) mainRecipeItems.push({
-				name: `自製酵母 (預先餵養 粉${Number(sdFlourWeight.toFixed(1))}g + 水${Number(sdWaterWeight.toFixed(1))}g)`,
+				name: `自製酵母 [提撥 ${sdPercent}% 麵粉・1:1] (粉${Number(sdFlourWeight.toFixed(1))}g + 水${Number(sdWaterWeight.toFixed(1))}g)`,
 				weight: sdTotalWeight,
+				percentLabel: `${sdPercent}%`,
 				colorClass: "text-orange-700",
 				hexColor: "#c2410c",
 				isPref: true
 			});
 			computedDry.forEach((ing) => {
 				if (ing.weight > 0) mainRecipeItems.push({
-					name: ing.name,
+					name: `${ing.name} (${ing.percentage}%)`,
 					weight: ing.weight,
+					percentLabel: `${ing.percentage}%`,
 					colorClass: "text-gray-800",
 					hexColor: "#1f2937"
 				});
 			});
 		}
-		const prefermentExportData = [];
-		if (tzPct > 0) prefermentExportData.push({
+		const allIngredientPercentages = [];
+		if (mainDoughFlourPercent > 0 && (totalFlourWeight > 0 || tzPct > 0 || sdPct > 0)) allIngredientPercentages.push({
+			name: "主麵團高筋麵粉",
+			percent: Number(mainDoughFlourPercent.toFixed(1)),
+			note: tzPct > 0 || sdPct > 0 ? "(扣除種麵後)" : "(總麵粉)"
+		});
+		if (tzPct > 0) allIngredientPercentages.push({
 			name: "湯種",
 			percent: tzPercent,
-			note: `(提撥麵粉・粉水比1:${tzRat})`
+			note: `(提撥麵粉・1:${tzRat}・總重${Number((tzPct * (1 + tzRat)).toFixed(1))}%)`,
+			isPref: true
 		});
-		if (sdPct > 0) prefermentExportData.push({
+		if (sdPct > 0) allIngredientPercentages.push({
 			name: "自製酵母",
 			percent: sdPercent,
-			note: "(提撥麵粉・粉水比1:1)"
+			note: `(提撥麵粉・1:1・總重${Number((sdPct * 2).toFixed(1))}%)`,
+			isPref: true
 		});
-		const ingredientExportData = [
-			...prefermentExportData,
-			...computedLiquids.filter((l) => parseNum(l.percentage) > 0).map((l) => ({
+		if (remainingWaterPercent > .05) allIngredientPercentages.push({
+			name: "主麵團純加水量",
+			percent: Number(remainingWaterPercent.toFixed(1)),
+			note: ""
+		});
+		computedLiquids.filter((l) => parseNum(l.percentage) > 0).forEach((l) => {
+			allIngredientPercentages.push({
 				name: l.name,
 				percent: l.percentage,
 				note: l.waterContent !== "" ? `(含水${l.waterContent}%)` : ""
-			})),
-			...computedDry.filter((d) => parseNum(d.percentage) > 0).map((d) => ({
+			});
+		});
+		computedDry.filter((d) => parseNum(d.percentage) > 0).forEach((d) => {
+			allIngredientPercentages.push({
 				name: d.name,
 				percent: d.percentage,
 				note: ""
-			}))
-		];
+			});
+		});
+		const ingredientExportData = allIngredientPercentages;
 		const portions = Math.max(1, Math.floor(parseNum(divideCount) || 1));
 		const perPortion = totalWeight > 0 ? totalWeight / portions : 0;
 		const totalBakeMinutes = parseNum(oven.bakeTime) + (oven.enableStage2 ? parseNum(oven.stage2BakeTime) : 0);
@@ -18962,6 +18983,10 @@ function App() {
 			targetHydrationNum: hydration,
 			totalFlourWeight,
 			totalWaterWeight,
+			tzPct,
+			tzRat,
+			sdPct,
+			mainDoughFlourPercent,
 			tzFlourWeight,
 			tzWaterWeight,
 			sdFlourWeight,
@@ -20880,6 +20905,103 @@ function App() {
 									})
 								]
 							}),
+							(calc.tzPct > 0 || calc.sdPct > 0) && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								style: {
+									backgroundColor: "#fef3c7",
+									border: "1.5px solid #f59e0b",
+									borderRadius: "14px",
+									padding: "16px 20px",
+									marginBottom: "22px"
+								},
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+									style: {
+										fontSize: "18px",
+										fontWeight: 900,
+										color: "#92400e",
+										marginBottom: "10px"
+									},
+									children: "🌾 湯種 / 自製酵母百分比設定"
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									style: {
+										display: "flex",
+										flexDirection: "column",
+										gap: "8px"
+									},
+									children: [calc.tzPct > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+										style: {
+											display: "flex",
+											justifyContent: "space-between",
+											alignItems: "center",
+											backgroundColor: "#ffffff",
+											padding: "10px 14px",
+											borderRadius: "10px",
+											border: "1px solid #fde68a"
+										},
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+											style: {
+												fontSize: "18px",
+												fontWeight: 800,
+												color: "#78350f"
+											},
+											children: [
+												"湯種 (粉水比 1:",
+												calc.tzRat,
+												")"
+											]
+										}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+											style: {
+												fontSize: "19px",
+												fontWeight: 900,
+												color: "#b45309"
+											},
+											children: [
+												"提撥麵粉 ",
+												tzPercent,
+												"% (含水 ",
+												Number((calc.tzPct * calc.tzRat).toFixed(1)),
+												"% · 總重",
+												" ",
+												Number((calc.tzFlourWeight + calc.tzWaterWeight).toFixed(1)),
+												"g)"
+											]
+										})]
+									}), calc.sdPct > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+										style: {
+											display: "flex",
+											justifyContent: "space-between",
+											alignItems: "center",
+											backgroundColor: "#ffffff",
+											padding: "10px 14px",
+											borderRadius: "10px",
+											border: "1px solid #fde68a"
+										},
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+											style: {
+												fontSize: "18px",
+												fontWeight: 800,
+												color: "#78350f"
+											},
+											children: "自製酵母 (粉水比 1:1)"
+										}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+											style: {
+												fontSize: "19px",
+												fontWeight: 900,
+												color: "#b45309"
+											},
+											children: [
+												"提撥麵粉 ",
+												sdPercent,
+												"% (含水 ",
+												Number(calc.sdPct.toFixed(1)),
+												"% · 總重",
+												" ",
+												Number((calc.sdFlourWeight + calc.sdWaterWeight).toFixed(1)),
+												"g)"
+											]
+										})]
+									})]
+								})]
+							}),
 							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 								style: { marginBottom: "24px" },
 								children: [
@@ -20892,7 +21014,7 @@ function App() {
 											borderBottom: "2.5px solid #e5e7eb",
 											paddingBottom: "10px"
 										},
-										children: "📋 主麵團實際投料"
+										children: "📋 主麵團實際投料 (含百分比標示)"
 									}),
 									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: calc.mainRecipeItems.map((item, idx) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 										style: {
@@ -20904,7 +21026,7 @@ function App() {
 										},
 										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
 											style: {
-												fontSize: "21px",
+												fontSize: "20px",
 												color: "#374151",
 												fontWeight: item.isMain || item.isPref ? 800 : 600
 											},
@@ -20954,26 +21076,45 @@ function App() {
 								style: { marginTop: "22px" },
 								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 									style: {
-										fontSize: "16px",
-										fontWeight: 800,
-										color: "#4b5563",
-										marginBottom: "8px"
-									},
-									children: "材料烘焙百分比設定："
-								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-									style: {
-										fontSize: "16px",
+										fontSize: "17px",
+										fontWeight: 900,
 										color: "#374151",
-										lineHeight: 1.8
+										marginBottom: "10px"
 									},
-									children: calc.ingredientExportData.map((p, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
-										i > 0 && " · ",
-										p.name,
-										" ",
-										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("strong", { children: [p.percent, "%"] }),
-										" ",
-										p.note
-									] }, i))
+									children: "📊 所有材料烘焙百分比設定 (含湯種・自製酵母)："
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+									style: { lineHeight: 1.8 },
+									children: calc.ingredientExportData.map((p, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+										style: {
+											display: "inline-block",
+											backgroundColor: p.isPref ? "#fef3c7" : "#f3f4f6",
+											border: p.isPref ? "1.5px solid #f59e0b" : "1px solid #e5e7eb",
+											padding: "6px 12px",
+											borderRadius: "8px",
+											fontSize: "16px",
+											color: p.isPref ? "#92400e" : "#1f2937",
+											margin: "5px 6px 0 0"
+										},
+										children: [
+											/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+												style: { fontWeight: 700 },
+												children: [p.name, ":"]
+											}),
+											" ",
+											/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("strong", {
+												style: { fontWeight: 900 },
+												children: [p.percent, "%"]
+											}),
+											" ",
+											p.note && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+												style: {
+													fontSize: "14px",
+													color: p.isPref ? "#b45309" : "#6b7280"
+												},
+												children: p.note
+											})
+										]
+									}, i))
 								})]
 							}),
 							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
