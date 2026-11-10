@@ -2083,16 +2083,18 @@ export default function App() {
                     {calc.mainRecipeItems.map((item, idx) => (
                       <li
                         key={`${item.name}-${idx}`}
-                        className="flex justify-between items-center py-2.5 px-1"
+                        className="flex justify-between items-center gap-3 py-2.5 px-1"
                       >
                         <span
-                          className={`text-gray-700 ${
+                          className={`text-gray-700 leading-snug ${
                             item.isMain || item.isPref ? 'font-bold' : 'font-medium'
                           }`}
                         >
                           {item.name}
                         </span>
-                        <span className={`font-black text-lg tabular-nums ${item.colorClass}`}>
+                        <span
+                          className={`font-black text-lg whitespace-nowrap shrink-0 tabular-nums ${item.colorClass}`}
+                        >
                           {Number(item.weight.toFixed(1))}{' '}
                           <span className="text-sm font-normal text-gray-400">g</span>
                         </span>

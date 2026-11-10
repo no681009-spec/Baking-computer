@@ -463,7 +463,7 @@
             els.liquidsContainer.innerHTML = liquidIngredients.map(createLiquidRowHTML).join('');
             els.liquidsContainer.querySelectorAll('.liquid-row').forEach(row => {
                 const id = row.dataset.id;
-                row.querySelector('.name-input').addEventListener('change', e => { const item = liquidIngredients.find(i => i.id === id); if (item) item.name = e.target.value; });
+                row.querySelector('.name-input').addEventListener('input', e => { const item = liquidIngredients.find(i => i.id === id); if (item) item.name = e.target.value; calculateAll(); });
                 row.querySelector('.percent-input').addEventListener('input', e => { const item = liquidIngredients.find(i => i.id === id); if (item) item.percentage = e.target.value; calculateAll(); });
                 row.querySelector('.water-content-input').addEventListener('input', e => { const item = liquidIngredients.find(i => i.id === id); if (item) item.waterContent = e.target.value; calculateAll(); });
                 const delBtn = row.querySelector('.delete-btn');
@@ -475,7 +475,7 @@
             els.ingredientsContainer.innerHTML = ingredients.map(createIngredientRowHTML).join('');
             els.ingredientsContainer.querySelectorAll('.ingredient-row').forEach(row => {
                 const id = row.dataset.id;
-                row.querySelector('.name-input').addEventListener('change', e => { const item = ingredients.find(i => i.id === id); if (item) item.name = e.target.value; });
+                row.querySelector('.name-input').addEventListener('input', e => { const item = ingredients.find(i => i.id === id); if (item) item.name = e.target.value; calculateAll(); });
                 row.querySelector('.percent-input').addEventListener('input', e => { const item = ingredients.find(i => i.id === id); if (item) item.percentage = e.target.value; calculateAll(); });
                 const delBtn = row.querySelector('.delete-btn');
                 if (delBtn) delBtn.addEventListener('click', () => { ingredients = ingredients.filter(i => i.id !== id); renderIngredients(); calculateAll(); });
@@ -527,8 +527,9 @@
             let prefWaterPercent = tzWaterPercent + sdWaterPercent;
             let totalProvidedWaterPercent = liquidProvidedWaterPercent + prefWaterPercent;
 
-            let waterExcessPercent = totalProvidedWaterPercent - targetHydration;
-            let isWaterExceeded = totalProvidedWaterPercent > 0.05 && waterExcessPercent > 0.05;
+            let waterExcessPercent = Math.max(0, totalProvidedWaterPercent - targetHydration);
+            let remainingWaterPercent = Math.max(0, targetHydration - totalProvidedWaterPercent);
+            let isWaterExceeded = totalProvidedWaterPercent > 0.05 && (totalProvidedWaterPercent - targetHydration) > 0.05;
 
             // 即時更新警示通知
             if (isWaterExceeded) {
@@ -568,11 +569,10 @@
                 if (els.stickyTopWaterWarning) els.stickyTopWaterWarning.className = 'hidden';
                 if (els.waterWarningSection2) {
                     if (hasTargetHydration && totalProvidedWaterPercent > 0) {
-                        const remaining = Math.max(0, targetHydration - totalProvidedWaterPercent);
                         els.waterWarningSection2.innerHTML = `
                             <div class="flex items-center justify-between text-blue-900 text-xs font-medium">
                                 <span>💧 材料已提供水份：<strong>${totalProvidedWaterPercent.toFixed(1)}%</strong> / 目標：<strong>${targetHydration}%</strong></span>
-                                <span class="font-bold">主麵團尚需純加水：${remaining.toFixed(1)}%</span>
+                                <span class="font-bold">主麵團尚需純加水：${remainingWaterPercent.toFixed(1)}%</span>
                             </div>
                         `;
                         els.waterWarningSection2.className = 'mt-2.5 p-2.5 bg-blue-100/70 border border-blue-200 rounded-lg text-blue-900 text-xs';
@@ -583,8 +583,7 @@
                 if (els.waterWarningSection4) els.waterWarningSection4.className = 'hidden';
                 if (els.waterBottomSection4) {
                     if (totalProvidedWaterPercent > 0) {
-                        const remaining = Math.max(0, targetHydration - totalProvidedWaterPercent);
-                        els.waterBottomSection4.innerHTML = `💧 目前材料折算總水份：<strong>${totalProvidedWaterPercent.toFixed(1)}%</strong> / 目標總水份：<strong>${targetHydration}%</strong>（尚需純水 ${remaining.toFixed(1)}%）`;
+                        els.waterBottomSection4.innerHTML = `💧 目前材料折算總水份：<strong>${totalProvidedWaterPercent.toFixed(1)}%</strong> / 目標總水份：<strong>${targetHydration}%</strong>（尚需純水 ${remainingWaterPercent.toFixed(1)}%）`;
                         els.waterBottomSection4.className = 'mt-4 p-3 rounded-xl bg-white/90 border border-blue-200 text-blue-900 font-medium text-xs sm:text-sm';
                     } else {
                         els.waterBottomSection4.className = 'hidden';
@@ -632,10 +631,10 @@
             els.sdFlourDisplay.textContent = sdFlourWeight > 0 ? Number(sdFlourWeight.toFixed(1)) + 'g' : '—';
             els.sdWaterDisplay.textContent = sdWaterWeight > 0 ? Number(sdWaterWeight.toFixed(1)) + 'g' : '—';
 
-            let mainRecipeItems = [];
-            let totalWeight = totalFlourWeight + totalWaterWeight; 
+            let totalWeight = totalFlourWeight + totalWaterWeight;
             let liquidProvidedWater = 0;
-            let ingredientExportData = []; 
+            let computedLiquidItems = [];
+            let ingredientExportData = [];
 
             els.liquidsContainer.querySelectorAll('.liquid-row').forEach(row => {
                 const id = row.dataset.id;
@@ -648,10 +647,15 @@
                     const solidInLiq = totalLiqWeight - waterInLiq;
                     row.querySelector('.weight-display').textContent = totalLiqWeight > 0 ? Number(totalLiqWeight.toFixed(1)) : '—';
                     row.querySelector('.water-display').textContent = waterInLiq > 0 ? Number(waterInLiq.toFixed(1)) + 'g' : '—';
-                    totalWeight += solidInLiq; 
+                    totalWeight += solidInLiq;
                     liquidProvidedWater += waterInLiq;
                     if (totalLiqWeight > 0) {
-                        mainRecipeItems.push({ name: `${liq.name} (${lp}%)`, weight: totalLiqWeight, color: 'text-blue-800' });
+                        computedLiquidItems.push({
+                            name: `${liq.name} (${lp}%)`,
+                            weight: totalLiqWeight,
+                            color: 'text-blue-800',
+                            hexColor: '#1e40af'
+                        });
                         ingredientExportData.push({ name: liq.name, percent: lp, note: `(水${wc}%)` });
                     }
                 }
@@ -661,21 +665,57 @@
             let mainDoughFlourPercent = Math.max(0, 100 - tzPercent - sdPercent);
             let prefWaterRemaining = tzWaterWeight + sdWaterWeight;
             let mainDoughWaterWeight = totalWaterWeight - prefWaterRemaining - liquidProvidedWater;
+            let excessWaterGrams = Math.max(0, -mainDoughWaterWeight);
 
+            let mainRecipeItems = [];
             if (mainDoughFlourWeight > 0) {
-                mainRecipeItems.unshift({ name: `主麵團高筋麵粉 (${Number(mainDoughFlourPercent.toFixed(1))}%)`, weight: mainDoughFlourWeight, color: 'text-amber-900', isMain: true });
+                mainRecipeItems.push({
+                    name: `主麵團高筋麵粉 (${Number(mainDoughFlourPercent.toFixed(1))}%)`,
+                    weight: mainDoughFlourWeight,
+                    color: 'text-amber-900',
+                    hexColor: '#78350f',
+                    isMain: true
+                });
             }
             if (mainDoughWaterWeight > 0.05) {
-                mainRecipeItems.splice(1, 0, { name: `主麵團純加水量 (${Number(remainingWaterPercent.toFixed(1))}%)`, weight: mainDoughWaterWeight, color: 'text-blue-600', isMain: true });
+                mainRecipeItems.push({
+                    name: `主麵團純加水量 (${Number(remainingWaterPercent.toFixed(1))}%)`,
+                    weight: mainDoughWaterWeight,
+                    color: 'text-blue-700',
+                    hexColor: '#1d4ed8',
+                    isMain: true
+                });
             } else if (isWaterExceeded || mainDoughWaterWeight < -0.05) {
-                mainRecipeItems.splice(1, 0, { name: '⚠️ 主麵團純加水 (已超標倒扣至 0g)', weight: 0, color: 'text-red-600', isMain: true });
+                mainRecipeItems.push({
+                    name: `⚠️ 主麵團純加水 (已超標 ${Number(excessWaterGrams.toFixed(1))}g 倒扣至 0g)`,
+                    weight: 0,
+                    color: 'text-red-600',
+                    hexColor: '#dc2626',
+                    isMain: true
+                });
             }
+
+            computedLiquidItems.forEach(item => mainRecipeItems.push(item));
+
             if (tzTotalWeight > 0) {
-                mainRecipeItems.push({ name: `湯種 [提撥 ${tzPercent}% 麵粉・1:${tzRatio}] (粉${Number(tzFlourWeight.toFixed(1))}g + 水${Number(tzWaterWeight.toFixed(1))}g)`, weight: tzTotalWeight, color: 'text-orange-700', isPref: true });
+                mainRecipeItems.push({
+                    name: `湯種 [提撥 ${tzPercent}% 麵粉・1:${tzRatio}] (粉${Number(tzFlourWeight.toFixed(1))}g + 水${Number(tzWaterWeight.toFixed(1))}g)`,
+                    weight: tzTotalWeight,
+                    color: 'text-orange-700',
+                    hexColor: '#c2410c',
+                    isPref: true
+                });
             }
             if (sdTotalWeight > 0) {
-                mainRecipeItems.push({ name: `自製酵母 [提撥 ${sdPercent}% 麵粉・1:1] (粉${Number(sdFlourWeight.toFixed(1))}g + 水${Number(sdWaterWeight.toFixed(1))}g)`, weight: sdTotalWeight, color: 'text-orange-700', isPref: true });
+                mainRecipeItems.push({
+                    name: `自製酵母 [提撥 ${sdPercent}% 麵粉・1:1] (粉${Number(sdFlourWeight.toFixed(1))}g + 水${Number(sdWaterWeight.toFixed(1))}g)`,
+                    weight: sdTotalWeight,
+                    color: 'text-orange-700',
+                    hexColor: '#c2410c',
+                    isPref: true
+                });
             }
+
             let headerExportData = [];
             if (mainDoughFlourPercent > 0 && (totalFlourWeight > 0 || tzPercent > 0 || sdPercent > 0)) {
                 headerExportData.push({ name: '主麵團高筋麵粉', percent: Number(mainDoughFlourPercent.toFixed(1)), note: (tzPercent > 0 || sdPercent > 0) ? '(扣除種麵後)' : '(總麵粉)' });
@@ -698,9 +738,14 @@
                     const ip = parseFloat(ing.percentage) || 0;
                     const totalIngWeight = (totalFlourWeight * ip) / 100;
                     row.querySelector('.weight-display').textContent = totalIngWeight > 0 ? Number(totalIngWeight.toFixed(1)) : '—';
-                    totalWeight += totalIngWeight; 
+                    totalWeight += totalIngWeight;
                     if (totalIngWeight > 0) {
-                        mainRecipeItems.push({ name: `${ing.name} (${ip}%)`, weight: totalIngWeight, color: 'text-gray-800' });
+                        mainRecipeItems.push({
+                            name: `${ing.name} (${ip}%)`,
+                            weight: totalIngWeight,
+                            color: 'text-gray-800',
+                            hexColor: '#1f2937'
+                        });
                         ingredientExportData.push({ name: ing.name, percent: ip, note: '' });
                     }
                 }
@@ -716,9 +761,9 @@
                 mainRecipeItems.forEach(item => {
                     let boldClass = item.isMain || item.isPref ? 'font-bold' : 'font-medium';
                     els.actualRecipeList.insertAdjacentHTML('beforeend', `
-                        <li class="flex justify-between items-center py-2.5 border-b border-gray-100 last:border-0 hover:bg-gray-50 px-2 rounded transition-colors">
-                            <span class="text-gray-700 ${boldClass}">${item.name}</span>
-                            <span class="font-black text-lg ${item.color}">${Number(item.weight.toFixed(1))} <span class="text-sm font-normal text-gray-400">g</span></span>
+                        <li class="flex justify-between items-center gap-3 py-2.5 border-b border-gray-100 last:border-0 hover:bg-gray-50 px-2 rounded transition-colors">
+                            <span class="text-gray-700 ${boldClass} leading-snug">${item.name}</span>
+                            <span class="font-black text-lg whitespace-nowrap shrink-0 tabular-nums ${item.color}">${Number(item.weight.toFixed(1))} <span class="text-sm font-normal text-gray-400">g</span></span>
                         </li>
                     `);
                 });
@@ -898,10 +943,11 @@
             els.exportImageBtn.classList.add('opacity-80', 'cursor-not-allowed');
 
             try {
+                calculateAll();
                 let itemsHtml = (currentRecipeData.items || []).map(item => `
                     <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 0; border-bottom: 1.5px dashed #e5e7eb;">
-                        <span style="font-size: 21px; color: #374151; font-weight: ${item.isMain || item.isPref ? '800' : '600'}; line-height: 1.4;">${item.name}</span>
-                        <span style="font-size: 24px; font-weight: 900; color: #1f2937; white-space: nowrap; flex-shrink: 0;">${Number(item.weight.toFixed(1))} <span style="font-size: 17px; font-weight: 500; color: #9ca3af;">g</span></span>
+                        <span style="font-size: 20px; color: #374151; font-weight: ${item.isMain || item.isPref ? '800' : '600'}; line-height: 1.4;">${item.name}</span>
+                        <span style="font-size: 24px; font-weight: 900; color: ${item.hexColor || '#1f2937'}; white-space: nowrap; flex-shrink: 0;">${Number(item.weight.toFixed(1))} <span style="font-size: 17px; font-weight: 500; color: #9ca3af;">g</span></span>
                     </div>
                 `).join('');
 
@@ -909,6 +955,12 @@
                     ? `<div style="margin-top: 18px; padding: 14px; background-color: #fef3c7; border-radius: 10px; font-size: 18px; color: #92400e; font-weight: 800; text-align: center;">
                            麵團分割：${currentRecipeData.divideCount} 份 / 每份約 ${currentRecipeData.perPortion} g
                        </div>` : '';
+
+                const topTempDisplay = currentRecipeData.topTemp ? `${currentRecipeData.topTemp}°C` : '—';
+                const bottomTempDisplay = currentRecipeData.isSingleTempMode
+                    ? (currentRecipeData.topTemp ? `${currentRecipeData.topTemp}°C` : '—')
+                    : (currentRecipeData.bottomTemp ? `${currentRecipeData.bottomTemp}°C` : '—');
+                const bakeTimeDisplay = currentRecipeData.bakeTime ? `${currentRecipeData.bakeTime} 分鐘` : '—';
 
                 const cardTemplate = `
                     <div id="captureArea" style="width: 620px; padding: 36px; background-color: #fdfbf7; font-family: 'Noto Sans TC', sans-serif; position: relative;">
@@ -922,39 +974,39 @@
                             
                             <div style="display: flex; justify-content: space-between; background-color: #fffbeb; padding: 18px 20px; border-radius: 14px; margin-bottom: 18px; border: 1.5px solid #fde68a;">
                                 <div style="text-align: center; flex: 1;">
-                                    <div style="font-size: 15px; font-weight: 700; color: #92400e; margin-bottom: 6px;">總麵粉量</div>
+                                    <div style="font-size: 15px; font-weight: 700; color: #92400e; margin-bottom: 6px;">總麵粉量 (100%)</div>
                                     <div style="font-size: 26px; font-weight: 900; color: #78350f;">${currentRecipeData.totalFlour}g</div>
                                 </div>
                                 <div style="width: 1.5px; background-color: #fcd34d;"></div>
                                 <div style="text-align: center; flex: 1;">
                                     <div style="font-size: 15px; font-weight: 700; color: #92400e; margin-bottom: 6px;">目標水合率</div>
-                                    <div style="font-size: 26px; font-weight: 900; color: #1e3a8a;">${currentRecipeData.hydration || 0}%</div>
+                                    <div style="font-size: 26px; font-weight: 900; color: #1e3a8a;">${currentRecipeData.hydration !== '' ? currentRecipeData.hydration + '%' : '—'}</div>
                                 </div>
                                 <div style="width: 1.5px; background-color: #fcd34d;"></div>
                                 <div style="text-align: center; flex: 1;">
-                                    <div style="font-size: 15px; font-weight: 700; color: #92400e; margin-bottom: 6px;">總重量約</div>
+                                    <div style="font-size: 15px; font-weight: 700; color: #92400e; margin-bottom: 6px;">麵團總重量</div>
                                     <div style="font-size: 26px; font-weight: 900; color: #065f46;">${currentRecipeData.finalWeight}g</div>
                                 </div>
                             </div>
 
                             <div style="background-color: #fff7ed; border: 1.5px solid #fed7aa; border-radius: 14px; padding: 18px 20px; margin-bottom: 26px;">
                                 <div style="font-size: 18px; font-weight: 900; color: #9a3412; margin-bottom: 12px;">
-                                    🔥 烤箱上下火設定 (${currentRecipeData.rackPos})
+                                    🔥 烤箱溫度設定 (${currentRecipeData.rackPos})
                                 </div>
                                 <div style="display: flex; justify-content: space-between; background: #fff; padding: 14px 16px; border-radius: 10px; border: 1.5px solid #ffedd5; text-align: center;">
                                     <div style="flex: 1;">
-                                        <div style="font-size: 15px; font-weight: 700; color: #6b7280; margin-bottom: 4px;">上火</div>
-                                        <div style="font-size: 26px; font-weight: 900; color: #b91c1c;">${currentRecipeData.topTemp || '—'}°C</div>
+                                        <div style="font-size: 15px; font-weight: 700; color: #6b7280; margin-bottom: 4px;">上火 (Top)</div>
+                                        <div style="font-size: 26px; font-weight: 900; color: #b91c1c;">${topTempDisplay}</div>
                                     </div>
                                     <div style="width: 1.5px; background: #fed7aa;"></div>
                                     <div style="flex: 1;">
-                                        <div style="font-size: 15px; font-weight: 700; color: #6b7280; margin-bottom: 4px;">下火</div>
-                                        <div style="font-size: 26px; font-weight: 900; color: #92400e;">${currentRecipeData.isSingleTempMode ? (currentRecipeData.topTemp || '—') : (currentRecipeData.bottomTemp || '—')}°C</div>
+                                        <div style="font-size: 15px; font-weight: 700; color: #6b7280; margin-bottom: 4px;">下火 (Bottom)</div>
+                                        <div style="font-size: 26px; font-weight: 900; color: #92400e;">${bottomTempDisplay}</div>
                                     </div>
                                     <div style="width: 1.5px; background: #fed7aa;"></div>
                                     <div style="flex: 1;">
                                         <div style="font-size: 15px; font-weight: 700; color: #6b7280; margin-bottom: 4px;">烘烤時間</div>
-                                        <div style="font-size: 26px; font-weight: 900; color: #1f2937;">${currentRecipeData.bakeTime || '—'} 分鐘</div>
+                                        <div style="font-size: 26px; font-weight: 900; color: #1f2937;">${bakeTimeDisplay}</div>
                                     </div>
                                 </div>
                                 ${currentRecipeData.bakeNotes ? `<div style="margin-top: 10px; font-size: 16px; font-weight: 600; color: #7c2d12;">備註：${currentRecipeData.bakeNotes}</div>` : ''}
@@ -969,7 +1021,7 @@
                             </div>
 
                             <div style="margin-top: 24px; text-align: center; font-size: 13px; color: #9ca3af; font-weight: 500;">
-                                匯出時間: ${new Date().toLocaleDateString('zh-TW')} | 烘焙百分比計算器
+                                匯出日期: ${new Date().toLocaleDateString('zh-TW')} · 烘焙百分比計算器
                             </div>
                         </div>
                     </div>
@@ -1002,7 +1054,7 @@
         function init() {
             renderLiquids();
             renderIngredients();
-            ['targetDoughWeight', 'targetHydration', 'tzPercent', 'tzRatio', 'sdPercent', 'divideCount', 'ovenTopTemp', 'ovenBottomTemp', 'ovenBakeTime', 'ovenRackPosition', 'ovenBakeNotes'].forEach(id => {
+            ['recipeName', 'targetDoughWeight', 'targetHydration', 'tzPercent', 'tzRatio', 'sdPercent', 'divideCount', 'ovenTopTemp', 'ovenBottomTemp', 'ovenBakeTime', 'ovenRackPosition', 'ovenBakeNotes'].forEach(id => {
                 document.getElementById(id).addEventListener('input', calculateAll);
             });
             els.tzRatio.addEventListener('change', calculateAll);
