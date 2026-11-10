@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>烘焙百分比計算器 — 含上下火烤箱溫度設定</title>
-    <meta name="description" content="以麵粉總量為 100% 精準換算的烘焙材料與上下火烤箱溫度計算工具，支援湯種、魯邦種、液體折水、上下火烤溫與精美配方卡匯出。" />
+    <meta name="description" content="以麵粉總量為 100% 精準換算的烘焙材料與上下火烤箱溫度計算工具，支援混合多種麵粉、湯種、魯邦種、液體折水、上下火烤溫與精美配方卡匯出。" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -83,6 +83,13 @@ interface DryIngredient {
   deletable: boolean;
 }
 
+interface FlourBlendItem {
+  id: string;
+  name: string;
+  percentage: number | string;
+  deletable: boolean;
+}
+
 interface OvenSettings {
   mode: 'dual' | 'single'; // 'dual' = 獨立上下火, 'single' = 單一溫度(上下同溫)
   topTemp: number | string;         // 上火 (°C)
@@ -102,6 +109,8 @@ interface SavedRecipe {
   recipeName: string;
   targetDoughWeight: number | string;
   targetHydration: number | string;
+  mainFlourName?: string;
+  blendedFlours?: FlourBlendItem[];
   tzPercent: number | string;
   tzRatio: number;
   sdPercent: number | string;
@@ -219,6 +228,10 @@ export default function App() {
   const [recipeName, setRecipeName] = useState<string>('');
   const [targetDoughWeight, setTargetDoughWeight] = useState<number | string>('');
   const [targetHydration, setTargetHydration] = useState<number | string>('');
+  const [mainFlourName, setMainFlourName] = useState<string>('高筋麵粉');
+  const [blendedFlours, setBlendedFlours] = useState<FlourBlendItem[]>([
+    { id: 'flour-blend-1', name: '全麥麵粉', percentage: '', deletable: false }
+  ]);
   const [tzPercent, setTzPercent] = useState<number | string>('');
   const [tzRatio, setTzRatio] = useState<number>(5);
   const [sdPercent, setSdPercent] = useState<number | string>('');
@@ -367,12 +380,32 @@ export default function App() {
     const waterExcessPercent = totalProvidedWaterPercent - hydration;
     const isWaterExceededByPercent = totalProvidedWaterPercent > 0.05 && waterExcessPercent > 0.05;
 
-    // 麵粉超標判斷：湯種 + 酵種提撥麵粉超過 100%
-    const flourWarning = tzPct + sdPct > 100.05;
+    // 混合副粉百分比加總 (相對於總麵粉 100%)
+    const blendedFlourTotalPercent = blendedFlours.reduce(
+      (sum, f) => sum + Math.max(0, parseNum(f.percentage)),
+      0
+    );
+
+    // 麵粉超標判斷：混合副粉% + 湯種提撥% + 自製酵母提撥% 超過 100%
+    const totalAllocatedFlourPercent = blendedFlourTotalPercent + tzPct + sdPct;
+    const flourExcessPercent = Math.max(0, totalAllocatedFlourPercent - 100);
+    const flourWarning = totalAllocatedFlourPercent > 100.05;
 
     const totalPercentage = 100 + hydration + dryPercentage + liquidSolidPercentage;
     const totalFlourWeight = totalPercentage > 0 && doughW > 0 ? doughW / (totalPercentage / 100) : 0;
     const totalWaterWeight = totalFlourWeight > 0 ? (totalFlourWeight * hydration) / 100 : 0;
+
+    const computedBlendedFlours = blendedFlours.map(f => {
+      const pct = Math.max(0, parseNum(f.percentage));
+      const weight = totalFlourWeight > 0 ? (totalFlourWeight * pct) / 100 : 0;
+      return {
+        ...f,
+        pct,
+        weight
+      };
+    });
+
+    const blendedFlourTotalWeight = computedBlendedFlours.reduce((sum, f) => sum + f.weight, 0);
 
     const tzFlourWeight = totalFlourWeight > 0 ? (totalFlourWeight * tzPct) / 100 : 0;
     const tzWaterWeight = tzFlourWeight * tzRat;
@@ -417,7 +450,10 @@ export default function App() {
       };
     });
 
-    const mainDoughFlourWeight = totalFlourWeight > 0 ? totalFlourWeight - tzFlourWeight - sdFlourWeight : 0;
+    const mainDoughFlourWeight =
+      totalFlourWeight > 0
+        ? totalFlourWeight - blendedFlourTotalWeight - tzFlourWeight - sdFlourWeight
+        : 0;
     const prefWaterRemaining = tzWaterWeight + sdWaterWeight;
     const mainDoughWaterWeight = totalFlourWeight > 0 ? totalWaterWeight - prefWaterRemaining - liquidProvidedWater : 0;
 
@@ -432,7 +468,8 @@ export default function App() {
 
     const remainingWaterPercent = Math.max(0, hydration - totalProvidedWaterPercent);
     const remainingWaterGrams = Math.max(0, mainDoughWaterWeight);
-    const mainDoughFlourPercent = Math.max(0, 100 - tzPct - sdPct);
+    const primaryFlourTotalPercent = Math.max(0, 100 - blendedFlourTotalPercent);
+    const mainDoughFlourPercent = Math.max(0, 100 - blendedFlourTotalPercent - tzPct - sdPct);
 
     const mainRecipeItems: Array<{
       name: string;
@@ -444,19 +481,37 @@ export default function App() {
       isPref?: boolean;
     }> = [];
 
+    const primaryLabel = mainFlourName.trim() || '高筋麵粉';
+
     if (totalFlourWeight > 0) {
-      if (mainDoughFlourWeight > 0) {
+      if (mainDoughFlourWeight > 0.05) {
         mainRecipeItems.push({
-          name: `主麵團高筋麵粉 (${Number(mainDoughFlourPercent.toFixed(1))}%)`,
+          name: `主麵團${primaryLabel} (${Number(mainDoughFlourPercent.toFixed(1))}%)`,
           weight: mainDoughFlourWeight,
           percentLabel: `${Number(mainDoughFlourPercent.toFixed(1))}%`,
           colorClass: 'text-amber-900',
           hexColor: '#78350f',
           isMain: true
         });
-      } else if (flourWarning || mainDoughFlourWeight < -0.05) {
+      }
+
+      computedBlendedFlours.forEach(bf => {
+        if (bf.weight > 0.05) {
+          const bfLabel = bf.name.trim() || '混合麵粉';
+          mainRecipeItems.push({
+            name: `主麵團${bfLabel} (${Number(bf.pct.toFixed(1))}%)`,
+            weight: bf.weight,
+            percentLabel: `${Number(bf.pct.toFixed(1))}%`,
+            colorClass: 'text-amber-800',
+            hexColor: '#92400e',
+            isMain: true
+          });
+        }
+      });
+
+      if (flourWarning || mainDoughFlourWeight < -0.05) {
         mainRecipeItems.push({
-          name: '⚠️ 麵粉提撥超過 100%',
+          name: `⚠️ 麵粉配比與提撥超過 100% (超額 +${Number(flourExcessPercent.toFixed(1))}%)`,
           weight: 0,
           colorClass: 'text-red-600',
           hexColor: '#dc2626',
@@ -537,13 +592,23 @@ export default function App() {
       isPref?: boolean;
     }> = [];
 
-    if (mainDoughFlourPercent > 0 && (totalFlourWeight > 0 || tzPct > 0 || sdPct > 0)) {
+    if (mainDoughFlourPercent > 0 && (totalFlourWeight > 0 || tzPct > 0 || sdPct > 0 || blendedFlourTotalPercent > 0)) {
       allIngredientPercentages.push({
-        name: '主麵團高筋麵粉',
+        name: `主麵團${primaryLabel}`,
         percent: Number(mainDoughFlourPercent.toFixed(1)),
-        note: tzPct > 0 || sdPct > 0 ? '(扣除種麵後)' : '(總麵粉)'
+        note: tzPct > 0 || sdPct > 0 ? '(扣除種麵與副粉後)' : blendedFlourTotalPercent > 0 ? '(扣除副粉後)' : '(總麵粉)'
       });
     }
+
+    computedBlendedFlours
+      .filter(bf => bf.pct > 0)
+      .forEach(bf => {
+        allIngredientPercentages.push({
+          name: `主麵團${bf.name.trim() || '混合麵粉'}`,
+          percent: Number(bf.pct.toFixed(1)),
+          note: '(混合麵粉)'
+        });
+      });
 
     if (tzPct > 0) {
       allIngredientPercentages.push({
@@ -607,7 +672,12 @@ export default function App() {
       tzPct,
       tzRat,
       sdPct,
+      primaryFlourTotalPercent,
+      blendedFlourTotalPercent,
       mainDoughFlourPercent,
+      mainDoughFlourWeight,
+      computedBlendedFlours,
+      flourExcessPercent,
       tzFlourWeight,
       tzWaterWeight,
       sdFlourWeight,
@@ -633,6 +703,8 @@ export default function App() {
   }, [
     targetDoughWeight,
     targetHydration,
+    mainFlourName,
+    blendedFlours,
     tzPercent,
     tzRatio,
     sdPercent,
@@ -643,6 +715,28 @@ export default function App() {
     oven.enableStage2,
     oven.stage2BakeTime
   ]);
+
+  // 新增/更新/刪除混合麵粉 - 新增時亦預設空白
+  const handleAddBlendedFlour = () => {
+    setBlendedFlours(prev => [
+      ...prev,
+      { id: generateId(), name: '低筋麵粉', percentage: '', deletable: true }
+    ]);
+  };
+
+  const handleUpdateBlendedFlour = (
+    id: string,
+    field: keyof FlourBlendItem,
+    value: string | number
+  ) => {
+    setBlendedFlours(prev =>
+      prev.map(item => (item.id === id ? { ...item, [field]: value } : item))
+    );
+  };
+
+  const handleDeleteBlendedFlour = (id: string) => {
+    setBlendedFlours(prev => prev.filter(item => item.id !== id));
+  };
 
   // 新增/更新/刪除液體與乾性材料 - 新增時亦預設空白
   const handleAddLiquid = () => {
@@ -699,6 +793,8 @@ export default function App() {
       recipeName: name,
       targetDoughWeight,
       targetHydration,
+      mainFlourName,
+      blendedFlours: [...blendedFlours],
       tzPercent,
       tzRatio,
       sdPercent,
@@ -718,6 +814,20 @@ export default function App() {
     setRecipeName(recipe.recipeName || '');
     setTargetDoughWeight(recipe.targetDoughWeight ?? '');
     setTargetHydration(recipe.targetHydration ?? '');
+    setMainFlourName(recipe.mainFlourName || '高筋麵粉');
+    if (recipe.blendedFlours) {
+      const parsedFlours =
+        typeof recipe.blendedFlours === 'string'
+          ? JSON.parse(recipe.blendedFlours)
+          : recipe.blendedFlours;
+      if (Array.isArray(parsedFlours) && parsedFlours.length > 0) {
+        setBlendedFlours(parsedFlours);
+      } else {
+        setBlendedFlours([{ id: 'flour-blend-1', name: '全麥麵粉', percentage: '', deletable: false }]);
+      }
+    } else {
+      setBlendedFlours([{ id: 'flour-blend-1', name: '全麥麵粉', percentage: '', deletable: false }]);
+    }
     setTzPercent(recipe.tzPercent ?? '');
     setTzRatio(Number(recipe.tzRatio) === 1 ? 1 : 5);
     setSdPercent(recipe.sdPercent ?? '');
@@ -785,6 +895,8 @@ export default function App() {
       recipeName: recipeName.trim() || '未命名配方',
       targetDoughWeight,
       targetHydration,
+      mainFlourName,
+      blendedFlours: JSON.stringify(blendedFlours),
       tzPercent,
       tzRatio,
       sdPercent,
@@ -939,6 +1051,10 @@ export default function App() {
     setRecipeName('');
     setTargetDoughWeight('');
     setTargetHydration('');
+    setMainFlourName('高筋麵粉');
+    setBlendedFlours([
+      { id: 'flour-blend-1', name: '全麥麵粉', percentage: '', deletable: false }
+    ]);
     setTzPercent('');
     setTzRatio(5);
     setSdPercent('');
@@ -1260,13 +1376,162 @@ export default function App() {
                 </div>
               ) : null}
 
+              {/* 麵粉配比設定：支援混合兩種或多種麵粉 (總麵粉合計 = 100%) */}
+              <div className="space-y-3 mt-6 border-t border-amber-200 pt-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-amber-900">
+                      🌾 麵粉配比設定（支援混合兩種或多種麵粉，總麵粉合計 = 100%）
+                    </h3>
+                    <p className="text-xs text-amber-800 mt-0.5">
+                      若只用單一麵粉可不填下方混合比例；若需混粉（如高筋 80% + 全麥 20%），只需輸入副粉比例，主力麵粉會自動扣除。
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddBlendedFlour}
+                    className="text-xs bg-amber-700 hover:bg-amber-800 text-white font-bold py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1 shadow-sm shrink-0 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>新增混合麵粉</span>
+                  </button>
+                </div>
+
+                {/* 第 1 種：主力麵粉 (自動計算剩餘比例) */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-white p-3.5 rounded-lg border border-amber-300 shadow-xs">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span className="text-xs font-black bg-amber-100 text-amber-900 px-2 py-1 rounded shrink-0">
+                      主力麵粉
+                    </span>
+                    <input
+                      type="text"
+                      value={mainFlourName}
+                      onChange={e => setMainFlourName(e.target.value)}
+                      placeholder="例如：高筋麵粉"
+                      className="w-full sm:w-44 p-1.5 border border-gray-300 rounded text-sm font-bold text-gray-800 focus:ring-1 focus:ring-amber-500 outline-none bg-amber-50/30"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between sm:justify-end gap-3 tabular-nums">
+                    <div className="text-xs text-amber-900 bg-amber-50 px-2.5 py-1.5 rounded border border-amber-200 font-bold">
+                      主麵團比例：
+                      <span className="text-sm font-black text-amber-950 ml-0.5">
+                        {Number(calc.mainDoughFlourPercent.toFixed(1))}%
+                      </span>
+                      {(calc.tzPct > 0 || calc.sdPct > 0) && (
+                        <span className="text-[11px] text-amber-700 font-normal ml-1">
+                          (已扣種麵 {Number((calc.tzPct + calc.sdPct).toFixed(1))}%)
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-right min-w-[76px]">
+                      <span className="font-black text-amber-900 text-base">
+                        {calc.totalFlourWeight > 0
+                          ? Number(Math.max(0, calc.mainDoughFlourWeight).toFixed(1))
+                          : '—'}
+                      </span>
+                      <span className="text-xs text-gray-500 ml-0.5">g</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 第 2 種 (或更多) 混合副粉列表 */}
+                {calc.computedBlendedFlours.map((bf, idx) => (
+                  <div
+                    key={bf.id}
+                    className="flex flex-col gap-2.5 bg-white p-3.5 rounded-lg border border-amber-200/90"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="text-xs font-bold bg-orange-100 text-orange-900 px-2 py-1 rounded shrink-0">
+                          混合粉 {idx + 2}
+                        </span>
+                        <input
+                          type="text"
+                          value={bf.name}
+                          onChange={e => handleUpdateBlendedFlour(bf.id, 'name', e.target.value)}
+                          placeholder="例如：全麥麵粉、低筋麵粉、裸麥粉..."
+                          className="w-full sm:w-44 p-1.5 border border-gray-300 rounded text-sm font-bold text-gray-800 focus:ring-1 focus:ring-amber-500 outline-none"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between sm:justify-end gap-2.5">
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-gray-600 font-medium">佔總麵粉</span>
+                          <input
+                            type="number"
+                            value={bf.percentage}
+                            placeholder="0"
+                            min={0}
+                            max={100}
+                            step={1}
+                            onChange={e =>
+                              handleUpdateBlendedFlour(bf.id, 'percentage', e.target.value)
+                            }
+                            className="w-16 p-1.5 border border-gray-300 rounded text-center focus:ring-1 focus:ring-amber-500 outline-none font-bold tabular-nums placeholder:text-gray-300"
+                          />
+                          <span className="text-xs text-gray-600 whitespace-nowrap">%</span>
+                        </div>
+
+                        <div className="text-right min-w-[76px] tabular-nums">
+                          <span className="font-black text-amber-800 text-base">
+                            {bf.weight > 0 ? Number(bf.weight.toFixed(1)) : '—'}
+                          </span>
+                          <span className="text-xs text-gray-500 ml-0.5">g</span>
+                        </div>
+
+                        {bf.deletable && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteBlendedFlour(bf.id)}
+                            className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-colors shrink-0 cursor-pointer"
+                            title="刪除此混合麵粉"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 常見副粉名稱快速帶入按鈕 */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-gray-100">
+                      <span className="text-[11px] text-gray-400">快速選取名稱：</span>
+                      {['全麥麵粉', '低筋麵粉', '中筋麵粉', '裸麥粉', '法國麵包粉'].map(presetName => (
+                        <button
+                          key={presetName}
+                          type="button"
+                          onClick={() => handleUpdateBlendedFlour(bf.id, 'name', presetName)}
+                          className={`text-[11px] px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                            bf.name === presetName
+                              ? 'bg-amber-700 text-white border-amber-700 font-bold'
+                              : 'bg-gray-50 hover:bg-amber-50 text-gray-600 border-gray-200'
+                          }`}
+                        >
+                          {presetName}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                {calc.flourWarning && (
+                  <div className="p-3 bg-red-100 border border-red-300 rounded-lg text-red-900 text-xs font-bold flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                    <span>
+                      ⚠️ 混合麵粉（{Number(calc.blendedFlourTotalPercent.toFixed(1))}%）與種麵提撥（
+                      {Number((calc.tzPct + calc.sdPct).toFixed(1))}%）總和已超過 100%（超額 +
+                      {Number(calc.flourExcessPercent.toFixed(1))}%），請調降比例！
+                    </span>
+                  </div>
+                )}
+              </div>
+
               {/* 進階：湯種/自製酵母 - 預設留白 */}
               <div className="space-y-3 mt-6 border-t border-amber-200 pt-5">
                 <h3 className="text-sm font-bold text-amber-900">
                   進階：提撥總麵粉製作湯種 / 酵種 (選填)
                 </h3>
                 <p className="text-xs text-amber-800 mb-3">
-                  若有使用請輸入提撥比例，系統會自動從總麵粉與總水量中扣除，計算主麵團用量。
+                  若有使用請輸入提撥比例，系統會自動從主力麵粉與總水量中扣除，計算主麵團用量。
                 </p>
 
                 {/* 湯種 */}
@@ -2110,7 +2375,10 @@ export default function App() {
               {calc.flourWarning && (
                 <div className="mb-4 text-red-700 text-xs font-bold bg-red-50 p-3 rounded-lg border border-red-200 flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                  <span>湯種與自製酵母提撥的麵粉比例總和已超過 100%，請調降提撥比例！</span>
+                  <span>
+                    混合麵粉與湯種/自製酵母提撥的麵粉比例總和已超過 100%（超額 +
+                    {Number(calc.flourExcessPercent.toFixed(1))}%），請調降比例！
+                  </span>
                 </div>
               )}
 
