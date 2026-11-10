@@ -2403,74 +2403,6 @@ export default function App() {
               )}
             </div>
 
-            {/* 湯種與自製酵母百分比專區 */}
-            {(calc.tzPct > 0 || calc.sdPct > 0) && (
-              <div
-                style={{
-                  backgroundColor: '#fef3c7',
-                  border: '1.5px solid #f59e0b',
-                  borderRadius: '14px',
-                  padding: '16px 20px',
-                  marginBottom: '22px'
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: '18px',
-                    fontWeight: 900,
-                    color: '#92400e',
-                    marginBottom: '10px'
-                  }}
-                >
-                  🌾 湯種 / 自製酵母百分比設定
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {calc.tzPct > 0 && (
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        backgroundColor: '#ffffff',
-                        padding: '10px 14px',
-                        borderRadius: '10px',
-                        border: '1px solid #fde68a'
-                      }}
-                    >
-                      <span style={{ fontSize: '18px', fontWeight: 800, color: '#78350f' }}>
-                        湯種 (粉水比 1:{calc.tzRat})
-                      </span>
-                      <span style={{ fontSize: '19px', fontWeight: 900, color: '#b45309' }}>
-                        提撥麵粉 {tzPercent}% (含水 {Number((calc.tzPct * calc.tzRat).toFixed(1))}% · 總重{' '}
-                        {Number((calc.tzFlourWeight + calc.tzWaterWeight).toFixed(1))}g)
-                      </span>
-                    </div>
-                  )}
-                  {calc.sdPct > 0 && (
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        backgroundColor: '#ffffff',
-                        padding: '10px 14px',
-                        borderRadius: '10px',
-                        border: '1px solid #fde68a'
-                      }}
-                    >
-                      <span style={{ fontSize: '18px', fontWeight: 800, color: '#78350f' }}>
-                        自製酵母 (粉水比 1:1)
-                      </span>
-                      <span style={{ fontSize: '19px', fontWeight: 900, color: '#b45309' }}>
-                        提撥麵粉 {sdPercent}% (含水 {Number(calc.sdPct.toFixed(1))}% · 總重{' '}
-                        {Number((calc.sdFlourWeight + calc.sdWaterWeight).toFixed(1))}g)
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
             {/* 實際投料清單 */}
             <div style={{ marginBottom: '24px' }}>
               <div
@@ -2493,6 +2425,7 @@ export default function App() {
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
+                      gap: '16px',
                       padding: '14px 0',
                       borderBottom: '1.5px dashed #e5e7eb'
                     }}
@@ -2501,12 +2434,21 @@ export default function App() {
                       style={{
                         fontSize: '20px',
                         color: '#374151',
-                        fontWeight: item.isMain || item.isPref ? 800 : 600
+                        fontWeight: item.isMain || item.isPref ? 800 : 600,
+                        lineHeight: 1.4
                       }}
                     >
                       {item.name}
                     </span>
-                    <span style={{ fontSize: '24px', fontWeight: 900, color: item.hexColor }}>
+                    <span
+                      style={{
+                        fontSize: '24px',
+                        fontWeight: 900,
+                        color: item.hexColor,
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0
+                      }}
+                    >
                       {Number(item.weight.toFixed(1))}{' '}
                       <span style={{ fontSize: '17px', fontWeight: 500, color: '#9ca3af' }}>
                         g
@@ -2534,50 +2476,9 @@ export default function App() {
               )}
             </div>
 
-            {/* 材料比例設定 */}
-            {calc.ingredientExportData.length > 0 && (
-              <div style={{ marginTop: '22px' }}>
-                <div
-                  style={{
-                    fontSize: '17px',
-                    fontWeight: 900,
-                    color: '#374151',
-                    marginBottom: '10px'
-                  }}
-                >
-                  📊 所有材料烘焙百分比設定 (含湯種・自製酵母)：
-                </div>
-                <div style={{ lineHeight: 1.8 }}>
-                  {calc.ingredientExportData.map((p, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        display: 'inline-block',
-                        backgroundColor: p.isPref ? '#fef3c7' : '#f3f4f6',
-                        border: p.isPref ? '1.5px solid #f59e0b' : '1px solid #e5e7eb',
-                        padding: '6px 12px',
-                        borderRadius: '8px',
-                        fontSize: '16px',
-                        color: p.isPref ? '#92400e' : '#1f2937',
-                        margin: '5px 6px 0 0'
-                      }}
-                    >
-                      <span style={{ fontWeight: 700 }}>{p.name}:</span>{' '}
-                      <strong style={{ fontWeight: 900 }}>{p.percent}%</strong>{' '}
-                      {p.note && (
-                        <span style={{ fontSize: '14px', color: p.isPref ? '#b45309' : '#6b7280' }}>
-                          {p.note}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <div
               style={{
-                marginTop: '30px',
+                marginTop: '24px',
                 textAlign: 'center',
                 fontSize: '13px',
                 color: '#9ca3af',
