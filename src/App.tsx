@@ -46,6 +46,14 @@ interface FlourBlendItem {
   deletable: boolean;
 }
 
+interface SourdoughStarterItem {
+  id: string;
+  name: string;
+  percentage: number | string;
+  waterRatio: number; // 粉水比 1 : waterRatio (預設 1 即 1:1)
+  deletable: boolean;
+}
+
 interface OvenSettings {
   mode: 'dual' | 'single'; // 'dual' = 獨立上下火, 'single' = 單一溫度(上下同溫)
   topTemp: number | string;         // 上火 (°C)
@@ -70,6 +78,7 @@ interface SavedRecipe {
   tzPercent: number | string;
   tzRatio: number;
   sdPercent: number | string;
+  sourdoughs?: SourdoughStarterItem[];
   divideCount: number | string;
   oven: OvenSettings;
   liquidIngredients: LiquidIngredient[];
@@ -190,7 +199,9 @@ export default function App() {
   ]);
   const [tzPercent, setTzPercent] = useState<number | string>('');
   const [tzRatio, setTzRatio] = useState<number>(5);
-  const [sdPercent, setSdPercent] = useState<number | string>('');
+  const [sourdoughs, setSourdoughs] = useState<SourdoughStarterItem[]>([
+    { id: 'sd-starter-1', name: '自製酵母 (天然酵母)', percentage: '', waterRatio: 1, deletable: false }
+  ]);
   const [divideCount, setDivideCount] = useState<number | string>('');
 
   // 烤箱溫度設定 (包含上下火) - 預設空白
@@ -321,11 +332,17 @@ export default function App() {
 
     const tzPct = Math.max(0, parseNum(tzPercent));
     const tzRat = tzRatio || 5;
-    const sdPct = Math.max(0, parseNum(sdPercent));
+
+    // 多種自製酵母 / 天然酵母加總 (相對於總麵粉 100%)
+    const sdPct = sourdoughs.reduce((sum, sd) => sum + Math.max(0, parseNum(sd.percentage)), 0);
 
     // 酵種水份百分比 (相對於總麵粉 100%)
     const tzWaterPercent = tzPct * tzRat;
-    const sdWaterPercent = sdPct * 1;
+    const sdWaterPercent = sourdoughs.reduce((sum, sd) => {
+      const pct = Math.max(0, parseNum(sd.percentage));
+      const rat = sd.waterRatio > 0 ? Number(sd.waterRatio) : 1;
+      return sum + pct * rat;
+    }, 0);
     const prefWaterPercent = tzWaterPercent + sdWaterPercent;
 
     // 所有材料與酵種合計提供之總水份百分比 (基準為 100% 總麵粉)
@@ -342,7 +359,7 @@ export default function App() {
       0
     );
 
-    // 麵粉超標判斷：混合副粉% + 湯種提撥% + 自製酵母提撥% 超過 100%
+    // 麵粉超標判斷：混合副粉% + 湯種提撥% + 所有天然酵母提撥% 超過 100%
     const totalAllocatedFlourPercent = blendedFlourTotalPercent + tzPct + sdPct;
     const flourExcessPercent = Math.max(0, totalAllocatedFlourPercent - 100);
     const flourWarning = totalAllocatedFlourPercent > 100.05;
@@ -367,9 +384,24 @@ export default function App() {
     const tzWaterWeight = tzFlourWeight * tzRat;
     const tzTotalWeight = tzFlourWeight + tzWaterWeight;
 
-    const sdFlourWeight = totalFlourWeight > 0 ? (totalFlourWeight * sdPct) / 100 : 0;
-    const sdWaterWeight = sdFlourWeight * 1;
-    const sdTotalWeight = sdFlourWeight + sdWaterWeight;
+    const computedSourdoughs = sourdoughs.map(sd => {
+      const pct = Math.max(0, parseNum(sd.percentage));
+      const ratio = sd.waterRatio > 0 ? Number(sd.waterRatio) : 1;
+      const flourWeight = totalFlourWeight > 0 ? (totalFlourWeight * pct) / 100 : 0;
+      const waterWeight = flourWeight * ratio;
+      const totalStarterWeight = flourWeight + waterWeight;
+      return {
+        ...sd,
+        pct,
+        ratio,
+        flourWeight,
+        waterWeight,
+        totalStarterWeight
+      };
+    });
+
+    const sdFlourWeight = computedSourdoughs.reduce((sum, sd) => sum + sd.flourWeight, 0);
+    const sdWaterWeight = computedSourdoughs.reduce((sum, sd) => sum + sd.waterWeight, 0);
 
     let totalWeight = totalFlourWeight + totalWaterWeight;
     let liquidProvidedWater = 0;
@@ -517,16 +549,19 @@ export default function App() {
         });
       }
 
-      if (sdTotalWeight > 0) {
-        mainRecipeItems.push({
-          name: `自製酵母 [提撥 ${sdPercent}% 麵粉・1:1] (粉${Number(sdFlourWeight.toFixed(1))}g + 水${Number(sdWaterWeight.toFixed(1))}g)`,
-          weight: sdTotalWeight,
-          percentLabel: `${sdPercent}%`,
-          colorClass: 'text-orange-700',
-          hexColor: '#c2410c',
-          isPref: true
-        });
-      }
+      computedSourdoughs.forEach(sd => {
+        if (sd.totalStarterWeight > 0) {
+          const sdLabel = sd.name.trim() || '自製酵母';
+          mainRecipeItems.push({
+            name: `${sdLabel} [提撥 ${sd.percentage}% 麵粉・1:${sd.ratio}] (粉${Number(sd.flourWeight.toFixed(1))}g + 水${Number(sd.waterWeight.toFixed(1))}g)`,
+            weight: sd.totalStarterWeight,
+            percentLabel: `${sd.percentage}%`,
+            colorClass: 'text-orange-700',
+            hexColor: '#c2410c',
+            isPref: true
+          });
+        }
+      });
 
       computedDry.forEach(ing => {
         if (ing.weight > 0) {
@@ -575,14 +610,16 @@ export default function App() {
       });
     }
 
-    if (sdPct > 0) {
-      allIngredientPercentages.push({
-        name: '自製酵母',
-        percent: sdPercent,
-        note: `(提撥麵粉・1:1・總重${Number((sdPct * 2).toFixed(1))}%)`,
-        isPref: true
+    computedSourdoughs
+      .filter(sd => sd.pct > 0)
+      .forEach(sd => {
+        allIngredientPercentages.push({
+          name: sd.name.trim() || '自製酵母',
+          percent: sd.percentage,
+          note: `(提撥麵粉・1:${sd.ratio}・總重${Number((sd.pct * (1 + sd.ratio)).toFixed(1))}%)`,
+          isPref: true
+        });
       });
-    }
 
     if (remainingWaterPercent > 0.05) {
       allIngredientPercentages.push({
@@ -633,6 +670,7 @@ export default function App() {
       mainDoughFlourPercent,
       mainDoughFlourWeight,
       computedBlendedFlours,
+      computedSourdoughs,
       flourExcessPercent,
       tzFlourWeight,
       tzWaterWeight,
@@ -663,7 +701,7 @@ export default function App() {
     blendedFlours,
     tzPercent,
     tzRatio,
-    sdPercent,
+    sourdoughs,
     divideCount,
     liquidIngredients,
     ingredients,
@@ -671,6 +709,34 @@ export default function App() {
     oven.enableStage2,
     oven.stage2BakeTime
   ]);
+
+  // 新增/更新/刪除天然酵母 - 新增時亦預設空白
+  const handleAddSourdough = () => {
+    setSourdoughs(prev => [
+      ...prev,
+      {
+        id: generateId(),
+        name: `天然酵母 ${prev.length + 1}`,
+        percentage: '',
+        waterRatio: 1,
+        deletable: true
+      }
+    ]);
+  };
+
+  const handleUpdateSourdough = (
+    id: string,
+    field: keyof SourdoughStarterItem,
+    value: string | number
+  ) => {
+    setSourdoughs(prev =>
+      prev.map(item => (item.id === id ? { ...item, [field]: value } : item))
+    );
+  };
+
+  const handleDeleteSourdough = (id: string) => {
+    setSourdoughs(prev => prev.filter(item => item.id !== id));
+  };
 
   // 新增/更新/刪除混合麵粉 - 新增時亦預設空白
   const handleAddBlendedFlour = () => {
@@ -753,7 +819,8 @@ export default function App() {
       blendedFlours: [...blendedFlours],
       tzPercent,
       tzRatio,
-      sdPercent,
+      sdPercent: sourdoughs[0]?.percentage ?? '',
+      sourdoughs: [...sourdoughs],
       divideCount,
       oven: { ...oven },
       liquidIngredients: [...liquidIngredients],
@@ -786,7 +853,37 @@ export default function App() {
     }
     setTzPercent(recipe.tzPercent ?? '');
     setTzRatio(Number(recipe.tzRatio) === 1 ? 1 : 5);
-    setSdPercent(recipe.sdPercent ?? '');
+    if (recipe.sourdoughs) {
+      const parsedSd =
+        typeof recipe.sourdoughs === 'string'
+          ? JSON.parse(recipe.sourdoughs)
+          : recipe.sourdoughs;
+      if (Array.isArray(parsedSd) && parsedSd.length > 0) {
+        setSourdoughs(
+          parsedSd.map((item: any, idx: number) => ({
+            id: item.id || generateId(),
+            name: item.name || (idx === 0 ? '自製酵母 (天然酵母)' : `天然酵母 ${idx + 1}`),
+            percentage: item.percentage ?? '',
+            waterRatio: Number(item.waterRatio) > 0 ? Number(item.waterRatio) : 1,
+            deletable: idx > 0 ? true : Boolean(item.deletable)
+          }))
+        );
+      } else {
+        setSourdoughs([
+          { id: 'sd-starter-1', name: '自製酵母 (天然酵母)', percentage: '', waterRatio: 1, deletable: false }
+        ]);
+      }
+    } else {
+      setSourdoughs([
+        {
+          id: 'sd-starter-1',
+          name: '自製酵母 (天然酵母)',
+          percentage: recipe.sdPercent ?? '',
+          waterRatio: 1,
+          deletable: false
+        }
+      ]);
+    }
     setDivideCount(recipe.divideCount ?? '');
 
     if (recipe.oven) {
@@ -855,7 +952,8 @@ export default function App() {
       blendedFlours: JSON.stringify(blendedFlours),
       tzPercent,
       tzRatio,
-      sdPercent,
+      sdPercent: sourdoughs[0]?.percentage ?? '',
+      sourdoughs: JSON.stringify(sourdoughs),
       divideCount,
       oven,
       topTemp: oven.topTemp,
@@ -1013,7 +1111,9 @@ export default function App() {
     ]);
     setTzPercent('');
     setTzRatio(5);
-    setSdPercent('');
+    setSourdoughs([
+      { id: 'sd-starter-1', name: '自製酵母 (天然酵母)', percentage: '', waterRatio: 1, deletable: false }
+    ]);
     setDivideCount('');
     setOven({
       mode: 'dual',
@@ -1481,18 +1581,30 @@ export default function App() {
                 )}
               </div>
 
-              {/* 進階：湯種/自製酵母 - 預設留白 */}
+              {/* 進階：湯種 / 多種天然酵母 (自製酵母) - 預設留白 */}
               <div className="space-y-3 mt-6 border-t border-amber-200 pt-5">
-                <h3 className="text-sm font-bold text-amber-900">
-                  進階：提撥總麵粉製作湯種 / 酵種 (選填)
-                </h3>
-                <p className="text-xs text-amber-800 mb-3">
-                  若有使用請輸入提撥比例，系統會自動從主力麵粉與總水量中扣除，計算主麵團用量。
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-amber-900">
+                      進階：提撥總麵粉製作湯種 / 天然酵母 (支援兩種以上天然酵母，選填)
+                    </h3>
+                    <p className="text-xs text-amber-800 mt-0.5">
+                      若有使用請輸入提撥比例，系統會自動從主力麵粉與總水量中扣除，計算主麵團用量。
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddSourdough}
+                    className="text-xs bg-orange-700 hover:bg-orange-800 text-white font-bold py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1 shadow-sm shrink-0 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>新增天然酵母</span>
+                  </button>
+                </div>
 
                 {/* 湯種 */}
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-white p-3.5 rounded-lg border border-amber-200/80">
-                  <div className="w-20 font-bold text-amber-900 text-sm shrink-0">湯種</div>
+                  <div className="w-24 font-bold text-amber-900 text-sm shrink-0">湯種</div>
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
                     <div className="flex items-center gap-1">
                       <input
@@ -1531,39 +1643,114 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 自製酵母 */}
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-white p-3.5 rounded-lg border border-amber-200/80">
-                  <div className="w-20 font-bold text-amber-900 text-sm shrink-0">自製酵母</div>
-                  <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        value={sdPercent}
-                        placeholder="0"
-                        min={0}
-                        max={100}
-                        step={1}
-                        onChange={e => setSdPercent(e.target.value)}
-                        className="w-16 p-1.5 border border-gray-300 rounded text-center focus:ring-1 focus:ring-amber-500 outline-none font-bold tabular-nums placeholder:text-gray-300"
-                      />
-                      <span className="text-xs text-gray-600 whitespace-nowrap">% 麵粉</span>
+                {/* 多種自製酵母 / 天然酵母列表 */}
+                {calc.computedSourdoughs.map((sd, idx) => (
+                  <div
+                    key={sd.id}
+                    className="flex flex-col gap-2.5 bg-white p-3.5 rounded-lg border border-amber-200/80"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                      <div className="flex items-center gap-2 min-w-0 sm:w-48 shrink-0">
+                        <span className="text-xs font-bold bg-amber-100 text-amber-900 px-2 py-1 rounded shrink-0">
+                          酵母 {idx + 1}
+                        </span>
+                        <input
+                          type="text"
+                          value={sd.name}
+                          onChange={e => handleUpdateSourdough(sd.id, 'name', e.target.value)}
+                          placeholder="例如：魯邦種、水果元種..."
+                          className="w-full p-1.5 border border-gray-300 rounded text-sm font-bold text-gray-800 focus:ring-1 focus:ring-amber-500 outline-none"
+                        />
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            value={sd.percentage}
+                            placeholder="0"
+                            min={0}
+                            max={100}
+                            step={1}
+                            onChange={e =>
+                              handleUpdateSourdough(sd.id, 'percentage', e.target.value)
+                            }
+                            className="w-16 p-1.5 border border-gray-300 rounded text-center focus:ring-1 focus:ring-amber-500 outline-none font-bold tabular-nums placeholder:text-gray-300"
+                          />
+                          <span className="text-xs text-gray-600 whitespace-nowrap">% 麵粉</span>
+                        </div>
+                        <select
+                          value={sd.waterRatio}
+                          onChange={e =>
+                            handleUpdateSourdough(
+                              sd.id,
+                              'waterRatio',
+                              parseFloat(e.target.value) || 1
+                            )
+                          }
+                          className="p-1.5 border border-gray-300 rounded text-xs text-gray-700 bg-white focus:ring-1 focus:ring-amber-500 outline-none font-medium"
+                        >
+                          <option value={1}>粉水比 1:1 (100%水)</option>
+                          <option value={0.5}>粉水比 1:0.5 (硬種 50%水)</option>
+                          <option value={0.6}>粉水比 1:0.6 (元種 60%水)</option>
+                          <option value={0.8}>粉水比 1:0.8 (80%水)</option>
+                          <option value={2}>粉水比 1:2 (液種 200%水)</option>
+                        </select>
+                      </div>
+
+                      <div className="flex items-center justify-between sm:justify-end gap-2 flex-1">
+                        <div className="text-xs text-gray-600 bg-amber-50/60 px-3 py-2 rounded border border-amber-100 flex-1 text-center sm:text-right tabular-nums">
+                          需預備: 粉{' '}
+                          <span className="font-bold text-gray-800">
+                            {sd.flourWeight > 0 ? Number(sd.flourWeight.toFixed(1)) : '—'}
+                          </span>
+                          g / 水{' '}
+                          <span className="font-bold text-blue-700">
+                            {sd.waterWeight > 0 ? Number(sd.waterWeight.toFixed(1)) : '—'}
+                          </span>
+                          g
+                        </div>
+
+                        {sd.deletable && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSourdough(sd.id)}
+                            className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-colors shrink-0 cursor-pointer"
+                            title="刪除此天然酵母"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <span className="p-1.5 text-xs text-gray-500 bg-gray-100 rounded border border-gray-200 font-medium whitespace-nowrap">
-                      固定粉水比 1:1
-                    </span>
+
+                    {/* 常見天然酵母名稱快速帶入按鈕 */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-gray-100">
+                      <span className="text-[11px] text-gray-400">快速選取名稱：</span>
+                      {[
+                        '自製酵母 (天然酵母)',
+                        '魯邦種 (Levain)',
+                        '水果酵母元種',
+                        '波蘭種 (Poolish)',
+                        '全麥天然酵種',
+                        '老麵'
+                      ].map(presetName => (
+                        <button
+                          key={presetName}
+                          type="button"
+                          onClick={() => handleUpdateSourdough(sd.id, 'name', presetName)}
+                          className={`text-[11px] px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                            sd.name === presetName
+                              ? 'bg-orange-700 text-white border-orange-700 font-bold'
+                              : 'bg-gray-50 hover:bg-orange-50 text-gray-600 border-gray-200'
+                          }`}
+                        >
+                          {presetName}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-600 bg-amber-50/60 px-3 py-2 rounded border border-amber-100 flex-1 text-center sm:text-right tabular-nums">
-                    需預備: 粉{' '}
-                    <span className="font-bold text-gray-800">
-                      {calc.sdFlourWeight > 0 ? Number(calc.sdFlourWeight.toFixed(1)) : '—'}
-                    </span>
-                    g / 水{' '}
-                    <span className="font-bold text-blue-700">
-                      {calc.sdWaterWeight > 0 ? Number(calc.sdWaterWeight.toFixed(1)) : '—'}
-                    </span>
-                    g
-                  </div>
-                </div>
+                ))}
               </div>
             </section>
 
