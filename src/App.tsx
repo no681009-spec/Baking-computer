@@ -71,6 +71,7 @@ interface OvenSettings {
 interface SavedRecipe {
   id: string;
   recipeName: string;
+  recipeNotes?: string;
   targetDoughWeight: number | string;
   targetHydration: number | string;
   mainFlourName?: string;
@@ -191,6 +192,7 @@ const STORAGE_KEY = 'bakers_calculator_saved_recipes_v2';
 export default function App() {
   // 基本配方狀態 - 預設空白，無任何預設數字
   const [recipeName, setRecipeName] = useState<string>('');
+  const [recipeNotes, setRecipeNotes] = useState<string>('');
   const [targetDoughWeight, setTargetDoughWeight] = useState<number | string>('');
   const [targetHydration, setTargetHydration] = useState<number | string>('');
   const [mainFlourName, setMainFlourName] = useState<string>('高筋麵粉');
@@ -813,6 +815,7 @@ export default function App() {
     const newEntry: SavedRecipe = {
       id: generateId(),
       recipeName: name,
+      recipeNotes: recipeNotes.trim(),
       targetDoughWeight,
       targetHydration,
       mainFlourName,
@@ -835,6 +838,7 @@ export default function App() {
   // 載入配方
   const applyRecipeObject = (recipe: Partial<SavedRecipe> & Record<string, any>) => {
     setRecipeName(recipe.recipeName || '');
+    setRecipeNotes(recipe.recipeNotes || '');
     setTargetDoughWeight(recipe.targetDoughWeight ?? '');
     setTargetHydration(recipe.targetHydration ?? '');
     setMainFlourName(recipe.mainFlourName || '高筋麵粉');
@@ -946,6 +950,7 @@ export default function App() {
     const name = (recipeName.trim() || '未命名配方').replace(/[\\/:*?"<>|]/g, '');
     const payload = {
       recipeName: recipeName.trim() || '未命名配方',
+      recipeNotes: recipeNotes.trim(),
       targetDoughWeight,
       targetHydration,
       mainFlourName,
@@ -1103,6 +1108,7 @@ export default function App() {
   // 全部清空為空白 - 不預設任何數字
   const handleReset = () => {
     setRecipeName('');
+    setRecipeNotes('');
     setTargetDoughWeight('');
     setTargetHydration('');
     setMainFlourName('高筋麵粉');
@@ -1300,19 +1306,63 @@ export default function App() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* 左側設定區 (7 欄) */}
           <div className="lg:col-span-7 space-y-6">
-            {/* 品項名稱設定 */}
-            <section className="bg-white rounded-xl p-5 border border-gray-200">
-              <label htmlFor="recipeName" className="block text-base font-bold text-gray-800 mb-2">
-                品項名稱 (選填)
-              </label>
-              <input
-                id="recipeName"
-                type="text"
-                value={recipeName}
-                onChange={e => setRecipeName(e.target.value)}
-                placeholder="例如：法式長棍麵包、山形鮮奶吐司、鹽可頌..."
-                className="w-full text-lg font-medium p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-colors bg-white"
-              />
+            {/* 品項名稱與配方筆記設定 */}
+            <section className="bg-white rounded-xl p-5 border border-gray-200 space-y-4">
+              <div>
+                <label htmlFor="recipeName" className="block text-base font-bold text-gray-800 mb-2">
+                  品項名稱 (選填)
+                </label>
+                <input
+                  id="recipeName"
+                  type="text"
+                  value={recipeName}
+                  onChange={e => setRecipeName(e.target.value)}
+                  placeholder="例如：法式長棍麵包、山形鮮奶吐司、鹽可頌..."
+                  className="w-full text-lg font-medium p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-colors bg-white"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-gray-100">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <label htmlFor="recipeNotes" className="block text-sm font-bold text-gray-800">
+                    📝 配方筆記 / 操作手法紀錄 (選填)
+                  </label>
+                  <span className="text-xs text-gray-400">
+                    將同步儲存至配方簿與匯出配方卡圖片中
+                  </span>
+                </div>
+                <textarea
+                  id="recipeNotes"
+                  rows={3}
+                  value={recipeNotes}
+                  onChange={e => setRecipeNotes(e.target.value)}
+                  placeholder="記錄操作手法，例如：&#10;• 攪拌終溫：26°C（水解法 30 分鐘後下鹽與酵母）&#10;• 基本發酵：28°C 發酵 60 分鐘（第 30 分鐘翻面摺疊 1 次）&#10;• 分割鬆弛：25 分鐘 / 最後發酵：32°C 發酵 50 分鐘"
+                  className="w-full text-sm font-medium p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-colors bg-amber-50/20 leading-relaxed resize-y placeholder:text-gray-400"
+                />
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  <span className="text-[11px] text-gray-400">快速插入標籤：</span>
+                  {[
+                    '攪拌終溫：°C',
+                    '基本發酵： 分鐘',
+                    '翻面摺疊： 次',
+                    '中間鬆弛： 分鐘',
+                    '最後發酵：°C / 分鐘'
+                  ].map(tag => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() =>
+                        setRecipeNotes(prev =>
+                          prev.trim() ? `${prev.replace(/\s+$/, '')}\n• ${tag}` : `• ${tag}`
+                        )
+                      }
+                      className="text-[11px] px-2 py-0.5 rounded bg-gray-50 hover:bg-amber-50 text-gray-600 hover:text-amber-900 border border-gray-200 hover:border-amber-200 transition-colors cursor-pointer"
+                    >
+                      + {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </section>
 
             {/* 1 & 2. 麵團總量與水合率、湯種/酵種設定 - 預設留白 */}
@@ -2602,6 +2652,18 @@ export default function App() {
                 </div>
               </div>
 
+              {/* 配方筆記預覽 */}
+              {recipeNotes.trim() && (
+                <div className="mt-4 p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl">
+                  <div className="text-xs font-bold text-amber-900 mb-1 flex items-center gap-1">
+                    <span>📝 配方筆記 / 操作手法</span>
+                  </div>
+                  <div className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">
+                    {recipeNotes.trim()}
+                  </div>
+                </div>
+              )}
+
               {/* 匯出精美配方卡按鈕 */}
               <div className="mt-6 pt-4 border-t border-gray-200">
                 <button
@@ -2933,6 +2995,43 @@ export default function App() {
               )}
             </div>
 
+            {/* 配方筆記與操作手法區塊 */}
+            {recipeNotes.trim() && (
+              <div
+                style={{
+                  backgroundColor: '#fffbeb',
+                  border: '1.5px solid #fde68a',
+                  borderRadius: '14px',
+                  padding: '18px 20px',
+                  marginBottom: '24px'
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '19px',
+                    fontWeight: 900,
+                    color: '#92400e',
+                    marginBottom: '10px',
+                    borderBottom: '1.5px dashed #fcd34d',
+                    paddingBottom: '8px'
+                  }}
+                >
+                  📝 配方筆記 / 操作手法紀錄
+                </div>
+                <div
+                  style={{
+                    fontSize: '17px',
+                    fontWeight: 600,
+                    color: '#374151',
+                    whiteSpace: 'pre-wrap',
+                    lineHeight: 1.65
+                  }}
+                >
+                  {recipeNotes.trim()}
+                </div>
+              </div>
+            )}
+
             <div
               style={{
                 marginTop: '24px',
@@ -3011,6 +3110,11 @@ export default function App() {
                           <span>·</span>
                           <span className="text-gray-400">{dateStr}</span>
                         </div>
+                        {item.recipeNotes && item.recipeNotes.trim() && (
+                          <div className="mt-2 text-xs text-gray-600 bg-amber-50/60 border border-amber-100 rounded-lg px-2.5 py-1.5 whitespace-pre-line line-clamp-2">
+                            📝 {item.recipeNotes.trim()}
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
