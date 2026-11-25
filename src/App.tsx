@@ -856,7 +856,8 @@ export default function App() {
       setBlendedFlours([{ id: 'flour-blend-1', name: '全麥麵粉', percentage: '', deletable: false }]);
     }
     setTzPercent(recipe.tzPercent ?? '');
-    setTzRatio(Number(recipe.tzRatio) === 1 ? 1 : 5);
+    const parsedTzRatio = Number(recipe.tzRatio);
+    setTzRatio([1, 2, 5].includes(parsedTzRatio) ? parsedTzRatio : 5);
     if (recipe.sourdoughs) {
       const parsedSd =
         typeof recipe.sourdoughs === 'string'
@@ -1676,6 +1677,7 @@ export default function App() {
                         className="p-1.5 border border-gray-300 rounded text-xs text-gray-700 bg-white focus:ring-1 focus:ring-amber-500 outline-none font-medium"
                       >
                         <option value={5}>粉水比 1:5</option>
+                        <option value={2}>粉水比 1:2</option>
                         <option value={1}>粉水比 1:1</option>
                       </select>
                     </div>
